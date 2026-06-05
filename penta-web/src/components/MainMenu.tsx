@@ -1,0 +1,164 @@
+import { useState } from 'react';
+import type { GameSettings, Clef, GameMode, Accidental } from '../types';
+import { initAudio } from '../utils/audio';
+import { getLeaderboardKey, loadLeaderboard } from '../utils/leaderboard';
+import Leaderboard from './Leaderboard';
+
+interface Props {
+  onStart: (settings: GameSettings) => void;
+}
+
+const KEY_SIG_OPTIONS = [
+  { label: 'Aleatoria', accidental: 'none' as Accidental, count: 0, random: true },
+  { label: 'Do mayor', accidental: 'none' as Accidental, count: 0, random: false },
+  ...([1,2,3,4,5,6].map(n => ({ label: `${n}♯`, accidental: 'sharp' as Accidental, count: n, random: false }))),
+  ...([1,2,3,4,5,6].map(n => ({ label: `${n}♭`, accidental: 'flat' as Accidental, count: n, random: false }))),
+];
+
+export default function MainMenu({ onStart }: Props) {
+  const [clef, setClef] = useState<Clef>('treble');
+  const [keySigIdx, setKeySigIdx] = useState(0);
+  const [difficulty, setDifficulty] = useState<0|1|2|3>(0);
+  const [mode, setMode] = useState<GameMode>('practice');
+
+  const selectedKeySig = KEY_SIG_OPTIONS[keySigIdx];
+
+  const settings: GameSettings = {
+    clef,
+    keySignature: { accidental: selectedKeySig.accidental, count: selectedKeySig.count },
+    randomKeySignature: selectedKeySig.random,
+    difficulty,
+    mode,
+  };
+
+  const lbKey = getLeaderboardKey(settings);
+  const leaderboard = loadLeaderboard(lbKey);
+
+  function handleStart() {
+    initAudio();
+    onStart(settings);
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-gray-950 to-gray-900 flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-lg">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="text-5xl mb-2">🎼</div>
+          <h1 className="text-4xl font-bold text-white tracking-tight">PentaTrainer</h1>
+          <p className="text-gray-400 mt-2 text-sm">Entrenamiento de lectura musical</p>
+        </div>
+
+        {/* Settings Card */}
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-4 space-y-5">
+
+          {/* Clave */}
+          <div>
+            <label className="text-gray-400 text-xs uppercase tracking-wider mb-2 block">Clave</label>
+            <div className="flex gap-2">
+              {(['treble', 'bass'] as Clef[]).map(c => (
+                <button
+                  key={c}
+                  onClick={() => setClef(c)}
+                  className={`flex-1 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                    clef === c
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
+                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                  }`}
+                >
+                  {c === 'treble' ? '𝄞 Sol (Violín)' : '𝄢 Fa (Bajo)'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Armadura */}
+          <div>
+            <label className="text-gray-400 text-xs uppercase tracking-wider mb-2 block">Armadura</label>
+            <select
+              value={keySigIdx}
+              onChange={e => setKeySigIdx(Number(e.target.value))}
+              className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500"
+            >
+              {KEY_SIG_OPTIONS.map((opt, i) => (
+                <option key={i} value={i}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Dificultad */}
+          <div>
+            <label className="text-gray-400 text-xs uppercase tracking-wider mb-2 block">
+              Dificultad — líneas adicionales
+            </label>
+            <div className="flex gap-2">
+              {([0,1,2,3] as (0|1|2|3)[]).map(d => (
+                <button
+                  key={d}
+                  onClick={() => setDifficulty(d)}
+                  className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${
+                    difficulty === d
+                      ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/40'
+                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                  }`}
+                >
+                  {d === 0 ? 'Básico' : `+${d}`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Modo */}
+          <div>
+            <label className="text-gray-400 text-xs uppercase tracking-wider mb-2 block">Modo de juego</label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setMode('practice')}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  mode === 'practice'
+                    ? 'bg-green-600 text-white shadow-lg shadow-green-900/40'
+                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                }`}
+              >
+                🎯 Práctica
+              </button>
+              <button
+                onClick={() => setMode('countdown')}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  mode === 'countdown'
+                    ? 'bg-red-600 text-white shadow-lg shadow-red-900/40'
+                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                }`}
+              >
+                ⏱ Contrarreloj
+              </button>
+            </div>
+            {mode === 'countdown' && (
+              <p className="text-xs text-gray-500 mt-2">
+                Empieza con 30s. Cada acierto rápido añade tiempo al reloj.
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Play Button */}
+        <button
+          onClick={handleStart}
+          className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold text-lg rounded-2xl transition-all shadow-xl shadow-blue-900/40 active:scale-95"
+        >
+          ▶ Jugar
+        </button>
+
+        {/* Leaderboard preview */}
+        {leaderboard.length > 0 && (
+          <div className="mt-6 bg-gray-900 border border-gray-800 rounded-2xl p-4">
+            <h3 className="text-gray-400 text-xs uppercase tracking-wider mb-3">
+              Top 5 — {mode === 'practice' ? 'Práctica' : 'Contrarreloj'} · Clave {clef === 'treble' ? 'Sol' : 'Fa'} · +{difficulty} líneas
+            </h3>
+            <Leaderboard entries={leaderboard} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
