@@ -10,16 +10,17 @@ interface Props {
   state: GameState;
   onKey: (key: string) => void;
   onTick: () => void;
+  onMenu: () => void;
 }
 
 const NOTE_KEYS = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
 
-export default function GameScreen({ state, onKey, onTick }: Props) {
+export default function GameScreen({ state, onKey, onTick, onMenu }: Props) {
   const { settings, noteSequence, currentIndex, answered, countdownSecondsLeft, countdownCorrect } = state;
   const isPlaying = state.phase === 'playing';
   const isCountdown = settings.mode === 'countdown';
 
-  useKeyboard(onKey, isPlaying);
+  useKeyboard(onKey, isPlaying, onMenu);
   useCountdown(isPlaying && isCountdown, onTick);
 
   // Wrong-answer flash: briefly show active note in red
@@ -47,16 +48,25 @@ export default function GameScreen({ state, onKey, onTick }: Props) {
     <div className="min-h-screen bg-gradient-to-b from-gray-950 to-gray-900 flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
-        <div className="text-sm text-gray-400">
-          <span className="text-white font-medium">
-            {settings.clef === 'treble' ? '𝄞 Sol' : '𝄢 Fa'}
-          </span>
-          {settings.keySignature.count > 0 && (
-            <span className="ml-2 text-gray-500">
-              {settings.keySignature.count}{settings.keySignature.accidental === 'sharp' ? '♯' : '♭'}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onMenu}
+            className="text-gray-600 hover:text-gray-300 text-xs transition-colors"
+            title="Volver al menú (Esc)"
+          >
+            ← Menú
+          </button>
+          <div className="text-sm text-gray-400">
+            <span className="text-white font-medium">
+              {settings.clef === 'treble' ? '𝄞 Sol' : '𝄢 Fa'}
             </span>
-          )}
-          <span className="ml-2 text-gray-600">+{settings.difficulty} líneas</span>
+            {settings.keySignature.count > 0 && (
+              <span className="ml-2 text-gray-500">
+                {settings.keySignature.count}{settings.keySignature.accidental === 'sharp' ? '♯' : '♭'}
+              </span>
+            )}
+            <span className="ml-2 text-gray-600">+{settings.difficulty} líneas</span>
+          </div>
         </div>
 
         {isCountdown ? (
@@ -100,7 +110,7 @@ export default function GameScreen({ state, onKey, onTick }: Props) {
       )}
 
       {/* Staff */}
-      <div className="px-2 pt-4 pb-2">
+      <div className="px-2 pt-4 pb-2 max-w-[920px] w-full mx-auto">
         <StaffSVG
           clef={settings.clef}
           keySignature={settings.keySignature}

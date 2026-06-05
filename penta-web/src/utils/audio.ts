@@ -47,6 +47,55 @@ export function playWrong() {
   playTone(160, 0.25, 'sawtooth', 0.18);
 }
 
+// Frequency tables keyed by adjustedIndex (= staffIndex - espacios)
+// Treble: F5 at adjustedIndex=0, descending diatonically
+const TREBLE_FREQS: Record<number, number> = {
+  [-6]: 1174.66, // D6
+  [-5]: 1046.50, // C6
+  [-4]:  987.77, // B5
+  [-3]:  880.00, // A5
+  [-2]:  783.99, // G5
+  [-1]:  698.46, // F5
+   [0]:  698.46, // F5
+   [1]:  659.25, // E5
+   [2]:  587.33, // D5
+   [3]:  523.25, // C5
+   [4]:  493.88, // B4
+   [5]:  440.00, // A4
+   [6]:  392.00, // G4
+   [7]:  349.23, // F4
+   [8]:  329.63, // E4
+   [9]:  293.66, // D4
+  [10]:  261.63, // C4
+  [11]:  246.94, // B3
+};
+
+// Bass: A3 at adjustedIndex=0, descending diatonically
+const BASS_FREQS: Record<number, number> = {
+  [-3]:  293.66, // D4
+  [-2]:  261.63, // C4
+  [-1]:  246.94, // B3
+   [0]:  220.00, // A3
+   [1]:  196.00, // G3
+   [2]:  174.61, // F3
+   [3]:  164.81, // E3
+   [4]:  146.83, // D3
+   [5]:  130.81, // C3
+   [6]:  123.47, // B2
+   [7]:  110.00, // A2
+   [8]:   98.00, // G2
+   [9]:   87.31, // F2
+  [10]:   82.41, // E2
+  [11]:   73.42, // D2
+};
+
+export function playNoteFrequency(staffIndex: number, espacios: number, clef: 'treble' | 'bass') {
+  const table = clef === 'treble' ? TREBLE_FREQS : BASS_FREQS;
+  const freq = table[staffIndex - espacios];
+  if (!freq) return;
+  playTone(freq, 0.5, 'sine', 0.25);
+}
+
 export function playGameOver() {
   const c = getCtx();
   [440, 349, 293].forEach((f, i) => {

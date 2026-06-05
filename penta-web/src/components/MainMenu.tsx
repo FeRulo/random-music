@@ -16,7 +16,7 @@ const KEY_SIG_OPTIONS = [
 ];
 
 export default function MainMenu({ onStart }: Props) {
-  const [clef, setClef] = useState<Clef>('treble');
+  const [clef, setClef] = useState<Clef>('bass');
   const [keySigIdx, setKeySigIdx] = useState(0);
   const [difficulty, setDifficulty] = useState<0|1|2|3>(0);
   const [mode, setMode] = useState<GameMode>('practice');
@@ -150,14 +150,12 @@ export default function MainMenu({ onStart }: Props) {
         </button>
 
         {/* Leaderboard preview */}
-        {leaderboard.length > 0 && (
-          <div className="mt-6 bg-gray-900 border border-gray-800 rounded-2xl p-4">
-            <h3 className="text-gray-400 text-xs uppercase tracking-wider mb-3">
-              Top 5 — {mode === 'practice' ? 'Práctica' : 'Contrarreloj'} · Clave {clef === 'treble' ? 'Sol' : 'Fa'} · +{difficulty} líneas
-            </h3>
-            <Leaderboard entries={leaderboard} />
-          </div>
-        )}
+        <div className="mt-6 bg-gray-900 border border-gray-800 rounded-2xl p-4">
+          <h3 className="text-gray-400 text-xs uppercase tracking-wider mb-3">
+            Top 5 — {mode === 'practice' ? 'Práctica' : 'Contrarreloj'} · Clave {clef === 'treble' ? 'Sol' : 'Fa'} · +{difficulty} líneas
+          </h3>
+          <Leaderboard entries={leaderboard} />
+        </div>
       </div>
     </div>
   );

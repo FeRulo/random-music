@@ -3,7 +3,7 @@ import { NOTES_PER_ROUND, COUNTDOWN_START_SECONDS, COUNTDOWN_BONUS_THRESHOLD_S }
 import { buildNotePool } from '../utils/noteMapping';
 import { generateNoteSequence } from '../utils/noteGenerator';
 import { randomKeySignature } from '../utils/keySignature';
-import { playCorrect, playWrong, playGameOver } from '../utils/audio';
+import { playNoteFrequency, playWrong, playGameOver } from '../utils/audio';
 import type { GameState, GameSettings, AnsweredNote } from '../types';
 
 type Action =
@@ -81,7 +81,7 @@ function reducer(state: GameState, action: Action): GameState {
       };
 
       if (correct) {
-        playCorrect();
+        playNoteFrequency(currentNote.staffIndex, state.settings.difficulty, state.settings.clef);
       } else {
         playWrong();
       }

@@ -1,5 +1,6 @@
 import type { NotePosition, Clef, KeySignature } from '../../types';
-import { SVG_WIDTH, SVG_HEIGHT, notesStartX, NOTE_SPACING } from './staffConstants';
+import { SVG_WIDTH, SVG_HEIGHT, STAFF_X_END, notesStartX, NOTE_SPACING } from './staffConstants';
+import { NOTES_PER_ROUND } from '../../constants';
 import StaffLines from './StaffLines';
 import ClefSymbol from './ClefSymbol';
 import KeySignatureAccidentals from './KeySignatureAccidentals';
@@ -23,7 +24,10 @@ export default function StaffSVG({
   wrongFlash,
 }: Props) {
   const keySigCount = keySignature.accidental === 'none' ? 0 : keySignature.count;
-  const firstNoteX = notesStartX(keySigCount);
+  const notesStart = notesStartX(keySigCount);
+  const totalNotesWidth = (NOTES_PER_ROUND - 1) * NOTE_SPACING;
+  const leftPad = Math.max(0, (STAFF_X_END - notesStart - totalNotesWidth) / 2);
+  const firstNoteX = notesStart + leftPad;
 
   function getNoteState(i: number): 'idle' | 'active' | 'correct' | 'wrong' {
     if (i < currentIndex) return 'correct';
@@ -35,7 +39,7 @@ export default function StaffSVG({
     <svg
       viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
       width="100%"
-      style={{ maxWidth: SVG_WIDTH, display: 'block' }}
+      style={{ maxWidth: SVG_WIDTH, display: 'block', margin: '0 auto' }}
       aria-label="Pentagrama musical"
     >
       {/* Fondo del pentagrama */}

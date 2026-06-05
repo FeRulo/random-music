@@ -13,8 +13,8 @@ export const LEDGER_HALF = 14;    // half-width of ledger lines
 
 // X layout
 export const CLEF_X = 28;
-export const KEYSIG_START_X = 72;
-export const KEYSIG_SPACING = 14;
+export const KEYSIG_START_X = 100;
+export const KEYSIG_SPACING = 8;
 export const NOTES_START_X = 160; // minimum x where notes begin (adjusted per key sig)
 export const NOTE_SPACING = 46;   // px between notes
 

@@ -11,7 +11,7 @@ export default function App() {
   }
 
   if (state.phase === 'playing') {
-    return <GameScreen state={state} onKey={pressKey} onTick={tick} />;
+    return <GameScreen state={state} onKey={pressKey} onTick={tick} onMenu={reset} />;
   }
 
   // result
