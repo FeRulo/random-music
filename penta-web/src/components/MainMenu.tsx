@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import type { GameSettings, Clef, GameMode, Accidental } from '../types';
+import { useState, useEffect, useRef } from 'react';
+import type { GameSettings, Clef, GameMode, Accidental, LeaderboardEntry } from '../types';
 import { initAudio } from '../utils/audio';
 import { getLeaderboardKey, loadLeaderboard } from '../utils/leaderboard';
 import Leaderboard from './Leaderboard';
@@ -32,7 +32,18 @@ export default function MainMenu({ onStart }: Props) {
   };
 
   const lbKey = getLeaderboardKey(settings);
-  const leaderboard = loadLeaderboard(lbKey);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+
+  useEffect(() => {
+    loadLeaderboard(lbKey).then(setLeaderboard);
+  }, [lbKey]);
+
+  const playBtnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const id = setTimeout(() => playBtnRef.current?.focus(), 150);
+    return () => clearTimeout(id);
+  }, []);
 
   function handleStart() {
     initAudio();
@@ -143,8 +154,9 @@ export default function MainMenu({ onStart }: Props) {
 
         {/* Play Button */}
         <button
+          ref={playBtnRef}
           onClick={handleStart}
-          className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold text-lg rounded-2xl transition-all shadow-xl shadow-blue-900/40 active:scale-95"
+          className="w-full py-4 bg-blue-600 hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400 text-white font-bold text-lg rounded-2xl transition-all shadow-xl shadow-blue-900/40 active:scale-95"
         >
           ▶ Jugar
         </button>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { GameState, LeaderboardEntry } from '../types';
 import {
   getLeaderboardKey, loadLeaderboard, insertEntry,
@@ -44,6 +44,14 @@ export default function ResultScreen({ state, onPlayAgain, onMenu }: Props) {
   }, [lbKey]);
 
   const needsName = !lbLoading && isTopScore(entries, score) && !nameSaved;
+  const playAgainRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!needsName && !lbLoading) {
+      const id = setTimeout(() => playAgainRef.current?.focus(), 150);
+      return () => clearTimeout(id);
+    }
+  }, [needsName, lbLoading]);
 
   function handleName(name: string) {
     const newEntry: LeaderboardEntry = {
@@ -118,8 +126,9 @@ export default function ResultScreen({ state, onPlayAgain, onMenu }: Props) {
         {/* Actions */}
         <div className="flex gap-3">
           <button
+            ref={playAgainRef}
             onClick={onPlayAgain}
-            className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl transition-all"
+            className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400 text-white font-semibold rounded-xl transition-all"
           >
             ▶ Jugar de nuevo
           </button>

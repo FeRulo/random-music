@@ -22,7 +22,7 @@ export default function Leaderboard({ entries, highlightIndex }: Props) {
           <th className="py-2 text-left">Nombre</th>
           <th className="py-2 text-right">Puntos</th>
           <th className="py-2 text-right hidden sm:table-cell">Dificultad</th>
-          <th className="py-2 text-right hidden sm:table-cell">Fecha</th>
+          <th className="py-2 text-right hidden sm:table-cell">Fecha y hora</th>
         </tr>
       </thead>
       <tbody>
@@ -40,7 +40,10 @@ export default function Leaderboard({ entries, highlightIndex }: Props) {
               +{e.difficulty} líneas
             </td>
             <td className="py-2 text-right text-gray-500 hidden sm:table-cell">
-              {new Date(e.date).toLocaleDateString('es-ES')}
+              {new Date(e.date).toLocaleString('es-CO', {
+                dateStyle: 'short',
+                timeStyle: 'short',
+              })}
             </td>
           </tr>
         ))}

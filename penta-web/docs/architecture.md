@@ -309,5 +309,19 @@ Rango de la tabla: –6 a +11 (cubre todas las posiciones posibles con `espacios
 |---|---|
 | Identificar nota | Teclas A-G (física) o botones virtuales |
 | Volver al menú durante el juego | Tecla `Escape` o botón "← Menú" en el header |
+| Iniciar nuevo juego desde resultado | `Enter` (botón "Jugar de nuevo" queda pre-enfocado) |
+| Iniciar juego desde el menú | `Enter` (botón "Jugar" queda pre-enfocado al montar) |
 
 `useKeyboard` acepta un tercer parámetro opcional `onEscape?: () => void` que dispara `RESET` en el engine.
+
+### Foco automático de botones principales
+
+`MainMenu` y `ResultScreen` enfocan su botón de acción principal mediante `useRef` + `useEffect` con un delay de 150 ms al montar el componente. El delay evita que el `keyup` de un Enter previo (p. ej., el que guardó el nombre en `NameEntry`) dispare inmediatamente el botón recién enfocado.
+
+En `ResultScreen`, el foco se difiere hasta que `needsName` sea `false` y el leaderboard haya cargado; si el jugador hizo un récord, el foco se transfiere al botón solo después de que guarda su nombre.
+
+---
+
+## Leaderboard — formato de fecha
+
+Las entradas se almacenan en ISO 8601 (`new Date().toISOString()`). La visualización usa `toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })` sin `timeZone` explícito, por lo que el navegador aplica automáticamente la zona horaria local del usuario.
