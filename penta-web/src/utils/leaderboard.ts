@@ -1,5 +1,6 @@
 import { LEADERBOARD_KEY_PREFIX, LEADERBOARD_MAX_ENTRIES } from '../constants';
 import type { GameSettings, LeaderboardEntry } from '../types';
+import { apiLoadLeaderboard } from './leaderboardApi';
 
 export function getLeaderboardKey(settings: GameSettings): string {
   const { mode, clef, keySignature, difficulty, randomKeySignature } = settings;
@@ -11,7 +12,7 @@ export function getLeaderboardKey(settings: GameSettings): string {
   return `${LEADERBOARD_KEY_PREFIX}${mode}_${clef}_${keySig}_${difficulty}`;
 }
 
-export function loadLeaderboard(key: string): LeaderboardEntry[] {
+export function loadLeaderboardLocal(key: string): LeaderboardEntry[] {
   try {
     return JSON.parse(localStorage.getItem(key) ?? '[]') as LeaderboardEntry[];
   } catch {
@@ -19,8 +20,18 @@ export function loadLeaderboard(key: string): LeaderboardEntry[] {
   }
 }
 
-export function saveLeaderboard(key: string, entries: LeaderboardEntry[]): void {
+export function saveLeaderboardLocal(key: string, entries: LeaderboardEntry[]): void {
   localStorage.setItem(key, JSON.stringify(entries.slice(0, LEADERBOARD_MAX_ENTRIES)));
+}
+
+export async function loadLeaderboard(key: string): Promise<LeaderboardEntry[]> {
+  try {
+    const entries = await apiLoadLeaderboard(key);
+    saveLeaderboardLocal(key, entries);
+    return entries;
+  } catch {
+    return loadLeaderboardLocal(key);
+  }
 }
 
 export function insertEntry(

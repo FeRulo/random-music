@@ -9,10 +9,11 @@
 | Estilos | Tailwind CSS v4 (plugin `@tailwindcss/vite`) |
 | Gráficos | SVG declarativo (JSX, sin librería de canvas) |
 | Audio | Web Audio API nativa |
-| Persistencia | `localStorage` |
+| Persistencia | SQLite (servidor local) + `localStorage` (fallback) |
+| Backend | Node.js + Express 5 + `better-sqlite3` |
 | Fuentes musicales | Bravura / FreeSerif (CDN) vía `<text>` SVG con Unicode SMuFL |
 
-No hay backend, ni dependencias de runtime más allá de React.
+El frontend es una SPA estática. El backend es un proceso Express local que expone la API de leaderboard; la app funciona sin él usando localStorage como fallback.
 
 ---
 
@@ -21,6 +22,10 @@ No hay backend, ni dependencias de runtime más allá de React.
 ```
 penta-web/
 ├── docs/               ← documentación (este directorio)
+├── server/
+│   ├── server.js           ← Express: GET/POST /api/leaderboard, CORS, poda top-5
+│   ├── db.js               ← inicialización SQLite (better-sqlite3), schema
+│   └── leaderboard.db      ← archivo SQLite generado en runtime (en .gitignore)
 ├── src/
 │   ├── types.ts            ← todos los tipos compartidos
 │   ├── constants.ts        ← CIFRADO, NOTES_PER_ROUND, etc.
@@ -31,12 +36,13 @@ penta-web/
 │   │   ├── noteGenerator.ts    ← secuencia aleatoria sin notas consecutivas
 │   │   ├── keySignature.ts     ← posiciones de alteraciones en pentagrama
 │   │   ├── audio.ts            ← sonidos Web Audio API
-│   │   └── leaderboard.ts      ← CRUD sobre localStorage
+│   │   ├── leaderboard.ts      ← loadLeaderboard (async, API-first) + helpers localStorage
+│   │   └── leaderboardApi.ts   ← fetch wrapper hacia localhost:3001 (timeout 2s)
 │   │
 │   ├── hooks/
 │   │   ├── useGameEngine.ts    ← máquina de estados del juego (useReducer)
 │   │   ├── useCountdown.ts     ← intervalo 100ms para modo contrarreloj
-│   │   └── useKeyboard.ts      ← captura de teclas A-G sobre window
+│   │   └── useKeyboard.ts      ← captura de teclas A-G + Escape sobre window
 │   │
 │   └── components/
 │       ├── MainMenu.tsx
@@ -127,9 +133,9 @@ menu ──START_GAME──► playing ──(16 notas ó reloj=0)──► resu
 | Acción | Efecto |
 |---|---|
 | `START_GAME` | Genera `noteSequence`, inicializa timers, `phase = 'playing'` |
-| `KEY_PRESSED` | Compara tecla con nota activa; actualiza `answered`, `practicePoints`, `currentIndex`, o bien `countdownCorrect` + bonus de tiempo |
+| `KEY_PRESSED` | Compara tecla con nota activa; actualiza `answered`, `practicePoints`, `currentIndex`, o bien `countdownCorrect` + bonus de tiempo; reproduce la frecuencia real de la nota si es acierto |
 | `TICK` | Decrementa `countdownSecondsLeft` en 0.1s; si ≤ 0 → `phase = 'result'` |
-| `RESET` | Vuelve al estado inicial (`phase = 'menu'`) |
+| `RESET` | Vuelve al estado inicial (`phase = 'menu'`) — también disparado por Escape |
 
 ### Fórmula de puntuación
 
@@ -171,10 +177,29 @@ Ledger lines: se dibujan en posiciones pares fuera del rango [d, d+8]
 x=10        STAFF_X_START (inicio de las 5 líneas)
 x=20..70    ClefSymbol
 x=72+       KeySignatureAccidentals (14 px entre alteraciones)
-x≥160       Primera nota (ajustado por el ancho de la armadura)
+x≥160       Primera nota (NOTES_START_X mínimo, ajustado por armadura)
 x+46        Cada nota siguiente (NOTE_SPACING = 46 px)
 x=910       STAFF_X_END
 ```
+
+Las 16 notas se centran horizontalmente en el espacio disponible entre el fin de la armadura y `STAFF_X_END`:
+
+```
+totalNotesWidth = 15 × 46 = 690 px
+leftPad = max(0, (STAFF_X_END - notesStartX - totalNotesWidth) / 2)
+firstNoteX = notesStartX + leftPad
+```
+
+### Posicionamiento de claves
+
+| Clave | Línea de referencia | y SVG |
+|---|---|---|
+| Sol (𝄞) | G line — línea 2 desde abajo | y=132 |
+| Fa (𝄢) | F line — línea 4 desde abajo | y=84 |
+
+Los dos puntos de la clave Fa se centran en los espacios que flanquean la línea 4:
+- Punto superior: `cy = line4Y - 12` = 72 (espacio entre líneas 4 y 5)
+- Punto inferior: `cy = line4Y + 12` = 96 (espacio entre líneas 3 y 4)
 
 ---
 
@@ -191,18 +216,66 @@ Fuente para clave Fa: arrays `sostenidos`/`bemoles` del script original `random-
 
 ---
 
-## Persistencia (localStorage)
+## Persistencia
 
-Clave: `rmusic_lb_{mode}_{clef}_{keySig}_{difficulty}`
+Los puntajes se guardan en un servidor Express local (puerto `3001`) respaldado por SQLite. El frontend también mantiene `localStorage` como caché y fallback para cuando el servidor no está disponible.
+
+### Servidor local (`server/`)
+
+| | |
+|---|---|
+| Puerto | `3001` |
+| Base de datos | `server/leaderboard.db` (SQLite, archivo local) |
+| `GET /api/leaderboard` | Devuelve top 5 para un conjunto `mode+clef+keySig+difficulty` |
+| `POST /api/leaderboard` | Inserta una entrada nueva y poda a top 5 |
+
+**Schema SQLite:**
+
+```sql
+CREATE TABLE leaderboard (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  mode       TEXT    NOT NULL,   -- 'practice' | 'countdown'
+  clef       TEXT    NOT NULL,   -- 'treble' | 'bass'
+  key_sig    TEXT    NOT NULL,   -- 'none' | 'random' | 'sharp2' | 'flat4' ...
+  difficulty INTEGER NOT NULL,   -- 0, 1, 2 ...
+  name       TEXT    NOT NULL,
+  score      INTEGER NOT NULL,
+  date       TEXT    NOT NULL    -- ISO 8601
+);
+```
+
+### Clave de leaderboard
+
+Formato: `rmusic_lb_{mode}_{clef}_{keySig}_{difficulty}`
 
 Ejemplos:
 - `rmusic_lb_practice_treble_sharp3_1`
 - `rmusic_lb_countdown_bass_none_0`
 - `rmusic_lb_practice_treble_random_2`
 
-Valor: array JSON de hasta 5 `LeaderboardEntry`, ordenado por score desc.
+### Flujo de carga y guardado
 
-Solo se guarda una entrada si `score > 0` y supera la puntuación mínima del Top 5.
+```
+ResultScreen mount
+  │
+  └─► loadLeaderboard(key)
+        ├─ GET /api/leaderboard  ──OK──► devuelve array, actualiza localStorage
+        └─ fetch falla/timeout   ──────► devuelve array de localStorage
+
+handleName(name)
+  ├─ insertEntry + saveLeaderboardLocal (sync, inmediato)
+  └─ apiSaveEntry(key, entry)  ← fire-and-forget, fallo silencioso
+```
+
+Solo se muestra el formulario de nombre si `score > 0` y supera el mínimo del Top 5 actual (y solo tras cargar el leaderboard para evitar falsos positivos).
+
+### Desarrollo
+
+```bash
+npm run dev:full   # arranca Vite (:5173) y Express (:3001) en paralelo
+npm run dev        # solo frontend (los puntajes caen a localStorage)
+npm run dev:server # solo el servidor Express
+```
 
 ---
 
@@ -210,8 +283,31 @@ Solo se guarda una entrada si `score > 0` y supera la puntuación mínima del To
 
 Sin ficheros externos. `AudioContext` se inicializa lazy en el primer click del usuario (política de autoplay del navegador).
 
-| Evento | Tipo oscilador | Frecuencias |
+| Evento | Función | Tipo oscilador | Detalle |
+|---|---|---|---|
+| Acierto | `playNoteFrequency` | sine | Frecuencia real de la nota identificada, 0.5 s |
+| Error | `playWrong` | sawtooth | 160 Hz, 0.25 s |
+| Fin de partida | `playGameOver` | sine | A4 → F4 → D4 en cascada |
+
+### `playNoteFrequency(staffIndex, espacios, clef)`
+
+Reproduce la frecuencia exacta de la nota en pantalla. Usa tablas de frecuencias precalculadas indexadas por `adjustedIndex = staffIndex - espacios`, que cubre el rango de `espacios` 0–3:
+
+| `adjustedIndex` | Treble | Bass |
 |---|---|---|
-| Acierto | sine | C5 → G5 (0ms, 70ms) |
-| Error | sawtooth | 160 Hz |
-| Fin de partida | sine | A4 → F4 → D4 (cascada) |
+| 0 | F5 — 698 Hz | A3 — 220 Hz |
+| 4 | B4 — 494 Hz | D3 — 147 Hz |
+| 8 | E4 — 330 Hz | G2 — 98 Hz |
+
+Rango de la tabla: –6 a +11 (cubre todas las posiciones posibles con `espacios` 0–3).
+
+---
+
+## Navegación y controles
+
+| Acción | Input |
+|---|---|
+| Identificar nota | Teclas A-G (física) o botones virtuales |
+| Volver al menú durante el juego | Tecla `Escape` o botón "← Menú" en el header |
+
+`useKeyboard` acepta un tercer parámetro opcional `onEscape?: () => void` que dispara `RESET` en el engine.

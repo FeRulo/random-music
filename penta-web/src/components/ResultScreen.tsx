@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { GameState, LeaderboardEntry } from '../types';
 import {
   getLeaderboardKey, loadLeaderboard, insertEntry,
-  saveLeaderboard, isTopScore,
+  saveLeaderboardLocal, isTopScore,
 } from '../utils/leaderboard';
+import { apiSaveEntry } from '../utils/leaderboardApi';
 import Leaderboard from './Leaderboard';
 import NameEntry from './NameEntry';
 
@@ -25,11 +26,24 @@ export default function ResultScreen({ state, onPlayAgain, onMenu }: Props) {
     : 0;
 
   const lbKey = getLeaderboardKey(settings);
-  const [entries, setEntries] = useState<LeaderboardEntry[]>(() => loadLeaderboard(lbKey));
+  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [lbLoading, setLbLoading] = useState(true);
   const [newEntryIndex, setNewEntryIndex] = useState<number | undefined>(undefined);
   const [nameSaved, setNameSaved] = useState(false);
 
-  const needsName = isTopScore(entries, score) && !nameSaved;
+  useEffect(() => {
+    let cancelled = false;
+    setLbLoading(true);
+    loadLeaderboard(lbKey).then(loaded => {
+      if (!cancelled) {
+        setEntries(loaded);
+        setLbLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [lbKey]);
+
+  const needsName = !lbLoading && isTopScore(entries, score) && !nameSaved;
 
   function handleName(name: string) {
     const newEntry: LeaderboardEntry = {
@@ -42,10 +56,11 @@ export default function ResultScreen({ state, onPlayAgain, onMenu }: Props) {
       mode: settings.mode,
     };
     const updated = insertEntry(entries, newEntry);
-    saveLeaderboard(lbKey, updated);
+    saveLeaderboardLocal(lbKey, updated);
     setEntries(updated);
     setNewEntryIndex(updated.findIndex(e => e === newEntry));
     setNameSaved(true);
+    apiSaveEntry(lbKey, newEntry).catch(() => {/* servidor no disponible, ya guardado en localStorage */});
   }
 
   const diffLabel = settings.difficulty === 0 ? 'Básico' : `+${settings.difficulty} líneas`;
