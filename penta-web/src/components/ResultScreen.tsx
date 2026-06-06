@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { GameState, LeaderboardEntry } from '../types';
+import { NOTES_PER_ROUND } from '../constants';
+import StaffSVG from './staff/StaffSVG';
 import {
   getLeaderboardKey, loadLeaderboard, insertEntry,
   saveLeaderboardLocal, isTopScore,
@@ -76,6 +78,35 @@ export default function ResultScreen({ state, onPlayAgain, onMenu }: Props) {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-950 to-gray-900 flex flex-col items-center justify-start py-8 px-4">
+
+      {/* Note summary — full width, same as gameplay */}
+      {answered.length > 0 && (() => {
+        const chunks: typeof answered[] = [];
+        for (let i = 0; i < answered.length; i += NOTES_PER_ROUND) {
+          chunks.push(answered.slice(i, i + NOTES_PER_ROUND));
+        }
+        return (
+          <div className="w-full max-w-5xl mb-6">
+            <h3 className="text-gray-400 text-xs uppercase tracking-wider mb-3 px-1">
+              Resumen de notas
+            </h3>
+            {chunks.map((chunk, ci) => (
+              <div key={ci} className="mb-3 rounded-2xl overflow-hidden">
+                <StaffSVG
+                  clef={settings.clef}
+                  keySignature={settings.keySignature}
+                  espacios={settings.difficulty}
+                  noteSequence={chunk.map(a => a.note)}
+                  currentIndex={chunk.length}
+                  wrongFlash={false}
+                  noteStates={chunk.map(a => a.correct ? 'correct' : 'wrong')}
+                />
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
       <div className="w-full max-w-md">
         {/* Score */}
         <div className="text-center mb-6">

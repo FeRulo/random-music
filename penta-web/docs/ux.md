@@ -129,6 +129,14 @@
 ### Layout
 
 ```
+┌────────────── SVG 920×240 (ancho completo, max-w-5xl) ───────────────┐
+│  RESUMEN DE NOTAS                                                     │
+│  𝄞  ♯♯♯  ● ● ○ ● ● ○ ● ● ● ● ● ○ ● ● ● ●                           │
+│        ─── ─── ─── ─── ─── ─── ─── ─── ─── ─── ─── ─── ─── ─── ─── │
+│  (verde = acertada, rojo = fallada)                                   │
+└───────────────────────────────────────────────────────────────────────┘
+       (en contrarreloj: un pentagrama adicional por cada 16 notas)
+
         🎯   (o ⏱ en contrarreloj)
     Ronda completada
     𝄞 Sol · Básico
@@ -151,6 +159,15 @@
 
   [ ▶ Jugar de nuevo ]   [ ← Menú ]
 ```
+
+### Resumen de notas (pentagrama post-ronda)
+
+- El pentagrama aparece **encima** del score y las estadísticas, a ancho completo (`max-w-5xl`), igual que durante el juego.
+- Cada nota se muestra con su posición real en el pentagrama (misma clave, armadura y dificultad de la ronda).
+- **Verde** (`correct`) = respondida correctamente. **Rojo** (`wrong`) = respondida incorrectamente.
+- En **práctica** (16 notas fijas): un solo pentagrama.
+- En **contrarreloj** (secuencias ilimitadas): un pentagrama por cada bloque de 16 notas respondidas, apilados verticalmente.
+- No se muestra el indicador azul de posición activa ni el anillo pulsante.
 
 ### Detalles
 

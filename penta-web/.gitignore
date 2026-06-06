@@ -11,7 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
-
+.codegraph/
 # SQLite database
 server/leaderboard.db
 server/leaderboard.db-shm

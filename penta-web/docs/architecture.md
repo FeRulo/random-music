@@ -52,7 +52,7 @@ penta-web/
 │       ├── Leaderboard.tsx
 │       └── staff/
 │           ├── staffConstants.ts   ← constantes de píxeles del SVG
-│           ├── StaffSVG.tsx        ← componente raíz del pentagrama
+│           ├── StaffSVG.tsx        ← componente raíz del pentagrama; acepta `noteStates` para modo resultado
 │           ├── StaffLines.tsx      ← 5 líneas horizontales
 │           ├── ClefSymbol.tsx      ← clave Sol / Fa (glifo Unicode)
 │           ├── KeySignatureAccidentals.tsx
@@ -148,6 +148,18 @@ Práctica:   acierto → points += delta  |  error → points -= delta
 Contrarreloj: acierto → correctCount++, timer += max(0, 3 - responseSecs)
               finalScore = correctCount
 ```
+
+---
+
+## `StaffSVG` — prop `noteStates` (modo resultado)
+
+`StaffSVG` acepta un prop opcional `noteStates?: ('correct' | 'wrong' | 'idle' | 'active')[]`. Cuando se pasa, sobreescribe la lógica `getNoteState` basada en `currentIndex`/`wrongFlash` y aplica directamente el estado de cada nota. El indicador de posición activa (línea vertical azul punteada) se suprime automáticamente.
+
+`ResultScreen` usa este prop para renderizar el pentagrama post-ronda: divide `answered` en bloques de `NOTES_PER_ROUND` y para cada bloque monta un `StaffSVG` con:
+- `noteSequence`: `chunk.map(a => a.note)`
+- `noteStates`: `chunk.map(a => a.correct ? 'correct' : 'wrong')`
+
+El pentagrama de resultados se muestra a ancho completo (`max-w-5xl`) encima del score y las estadísticas, con la misma clave, armadura y dificultad de la ronda jugada.
 
 ---
 

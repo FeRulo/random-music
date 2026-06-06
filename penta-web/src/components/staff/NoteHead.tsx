@@ -46,15 +46,11 @@ export default function NoteHead({ x, staffIndex, espacios, state }: Props) {
 
   const ledgerLines: number[] = [];
   if (staffIndex < staffTop) {
-    // Above staff: draw ledger lines from staffTop-2 down to staffIndex (even positions)
-    const start = staffTop % 2 === 0 ? staffTop - 2 : staffTop - 1;
-    for (let p = start; p >= staffIndex; p -= 2) {
+    for (let p = staffTop - 2; p >= staffIndex; p -= 2) {
       ledgerLines.push(p);
     }
   } else if (staffIndex > staffBottom) {
-    // Below staff: draw ledger lines from staffBottom+2 up to staffIndex (even positions)
-    const start = staffBottom % 2 === 0 ? staffBottom + 2 : staffBottom + 1;
-    for (let p = start; p <= staffIndex; p += 2) {
+    for (let p = staffBottom + 2; p <= staffIndex; p += 2) {
       ledgerLines.push(p);
     }
   }

@@ -13,6 +13,7 @@ interface Props {
   noteSequence: NotePosition[];
   currentIndex: number;
   wrongFlash: boolean;
+  noteStates?: ('correct' | 'wrong' | 'idle' | 'active')[];
 }
 
 export default function StaffSVG({
@@ -22,6 +23,7 @@ export default function StaffSVG({
   noteSequence,
   currentIndex,
   wrongFlash,
+  noteStates,
 }: Props) {
   const keySigCount = keySignature.accidental === 'none' ? 0 : keySignature.count;
   const notesStart = notesStartX(keySigCount);
@@ -30,6 +32,7 @@ export default function StaffSVG({
   const firstNoteX = notesStart + leftPad;
 
   function getNoteState(i: number): 'idle' | 'active' | 'correct' | 'wrong' {
+    if (noteStates) return noteStates[i] ?? 'idle';
     if (i < currentIndex) return 'correct';
     if (i === currentIndex) return wrongFlash ? 'wrong' : 'active';
     return 'idle';
@@ -65,7 +68,7 @@ export default function StaffSVG({
       })}
 
       {/* Indicador de posición actual (línea vertical punteada) */}
-      {currentIndex < noteSequence.length && (
+      {!noteStates && currentIndex < noteSequence.length && (
         <line
           x1={firstNoteX + currentIndex * NOTE_SPACING}
           y1={20}
