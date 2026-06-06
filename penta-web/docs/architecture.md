@@ -42,7 +42,8 @@ penta-web/
 │   ├── hooks/
 │   │   ├── useGameEngine.ts    ← máquina de estados del juego (useReducer)
 │   │   ├── useCountdown.ts     ← intervalo 100ms para modo contrarreloj
-│   │   └── useKeyboard.ts      ← captura de teclas A-G + Escape sobre window
+│   │   ├── useKeyboard.ts      ← captura de teclas A-G + Escape sobre window
+│   │   └── useMetronome.ts     ← scheduler lookahead Web Audio (ritmo)
 │   │
 │   └── components/
 │       ├── MainMenu.tsx
@@ -71,7 +72,7 @@ interface GameState {
   settings: GameSettings;         // configuración seleccionada en menú
   noteSequence: NotePosition[];   // 16 notas generadas para la ronda
   currentIndex: number;           // nota activa (0-15)
-  noteStartTime: number;          // performance.now() al mostrar la nota
+  noteStartTime: number;          // performance.now() al mostrar la nota (en ritmo: beatWallTime)
   answered: AnsweredNote[];       // historial de todas las pulsaciones
   practicePoints: number;         // puntos acumulados (práctica)
   practiceGameStartTime: number;
@@ -79,6 +80,11 @@ interface GameState {
   countdownStartTime: number;
   countdownCorrect: number;       // aciertos totales en contrarreloj
   finalScore: number | null;      // score calculado al terminar la ronda
+  // Enfoque ritmo (inactivos cuando settings.rhythmMode === false)
+  ritmoBpmCurrent: number;         // BPM vivo (sube durante partida en countdown)
+  ritmoBeatCount: number;          // beats disparados desde el inicio
+  ritmoScore: number;              // score timing-weighted acumulado (Práctica + Ritmo)
+  ritmoBpmJustIncreased: boolean;  // true durante 1 beat tras subida → flash UI
 }
 ```
 
@@ -337,3 +343,88 @@ En `ResultScreen`, el foco se difiere hasta que `needsName` sea `false` y el lea
 ## Leaderboard — formato de fecha
 
 Las entradas se almacenan en ISO 8601 (`new Date().toISOString()`). La visualización usa `toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })` sin `timeZone` explícito, por lo que el navegador aplica automáticamente la zona horaria local del usuario.
+
+---
+
+## Enfoque Ritmo — extensión de la arquitectura
+
+Ver spec completa en [`docs/rhythm-mode-spec.md`](./rhythm-mode-spec.md).
+
+### Nuevos campos en `GameSettings`
+
+```ts
+rhythmMode: boolean;        // false = velocidad (sin cambios), true = ritmo
+ritmoBpm: number;           // BPM inicial: 40–200, default 120 (= 500ms/nota)
+ritmoAccelStep: number;     // BPM añadidos cada 16 notas en countdown (default 10)
+```
+
+`GameMode` no cambia (`'practice' | 'countdown'`). El enfoque ritmo es ortogonal al tipo de juego.
+
+### Campo adicional en `AnsweredNote`
+
+```ts
+timingAccuracy: number | null;   // 0.0–1.0 en ritmo; null en velocidad
+missed: boolean;                 // true si el beat avanzó sin respuesta correcta
+```
+
+### Nuevas acciones del reducer
+
+| Acción | Efecto |
+|---|---|
+| `BEAT` | Avanza `currentIndex`; registra miss si sin acierto; actualiza `noteStartTime = beatWallTime`; limpia `ritmoBpmJustIncreased` |
+| `BPM_INCREASE` | `ritmoBpmCurrent += ritmoAccelStep`; `ritmoBpmJustIncreased = true` |
+
+En modo ritmo, `KEY_PRESSED` **no avanza `currentIndex`** — solo registra el intento con `timingAccuracy`. Solo `BEAT` avanza la nota.
+
+### `useMetronome` — patrón lookahead Web Audio
+
+```
+SCHEDULE_AHEAD_S = 0.1s    ← pre-programar beats en AudioContext.currentTime
+SCHEDULER_INTERVAL = 25ms  ← tick JS que rellena la ventana
+
+Por cada beat en la ventana:
+  1. scheduleMetronomeClick(beatAudioTime, isDownbeat) → click en AudioContext
+  2. dispatch({ type: 'BEAT', beatAudioTime, beatWallTime })
+  3. Si beatIndex % 16 === 0 → dispatch({ type: 'BPM_INCREASE' })
+
+bpmRef sincronizado con ritmoBpmCurrent vía useEffect — cambio de BPM sin reiniciar el intervalo.
+```
+
+Conversión AudioContext → wall-clock (para comparar con `performance.now()` en `KEY_PRESSED`):
+```
+wallOffset   = performance.now() − ctx.currentTime × 1000
+beatWallTime = beatAudioTime × 1000 + wallOffset
+```
+
+### Fórmula de scoring ritmo
+
+```
+beatWindowMs   = 60000 / bpm
+timingOffset   = |pressWallTime − beatWallTime|
+timingAccuracy = max(0, 1 − timingOffset / (beatWindowMs × 0.5))
+baseDelta      = (900 + 100 × difficulty) × (bpm / 60)
+noteScore      = baseDelta × timingAccuracy        // solo si correct === true
+finalScore     = round(sum(noteScore))             // Práctica + Ritmo
+```
+
+En **Contrarreloj + Ritmo**: score = aciertos totales; bonus de tiempo = `timingAccuracy × 3s`.
+
+### Nuevas constantes
+
+```ts
+RITMO_BPM_DEFAULT        = 120
+RITMO_BPM_MIN            = 40
+RITMO_BPM_MAX            = 200   // máximo configurable en menú
+RITMO_BPM_MAX_GAMEPLAY   = 220   // techo durante aceleración
+RITMO_BPM_STEP           = 10
+RITMO_ACCEL_STEP_DEFAULT = 10
+```
+
+### Clave de leaderboard
+
+```
+Velocidad:  rmusic_lb_{mode}_{clef}_{keySig}_{difficulty}              (sin cambio)
+Ritmo:      rmusic_lb_{mode}_rhythm_{clef}_{keySig}_{difficulty}_{bpm}bpm
+```
+
+Los leaderboards de velocidad no se tocan. Cero migración.

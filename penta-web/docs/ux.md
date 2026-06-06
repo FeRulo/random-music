@@ -52,13 +52,23 @@
 │  DIFICULTAD — LÍNEAS ADICIONALES│
 │  [ Básico ] [ +1 ] [ +2 ] [ +3 ]│
 │                                 │
-│  MODO DE JUEGO                  │
+│  TIPO DE JUEGO                  │
 │  [ 🎯 Práctica ] [ ⏱ Contrarreloj ] │
+│                                 │
+│  ENFOQUE                        │
+│  [ ⚡ Velocidad ] [ 🎵 Ritmo ]  │
+│                                 │
+│  (solo si Ritmo activo:)        │
+│  BPM INICIAL — ♩ = 120          │
+│  [──────────●──────────]        │
+│   40                  200       │
+│  (si Contrarreloj + Ritmo:)     │
+│  Acelera +10 BPM cada 16 notas  │
 └─────────────────────────────────┘
 
         [ ▶ Jugar ]
 
-   Top 5 — [modo] · Clave [X] · +N líneas
+   Top 5 — [tipo]·[enfoque] · Clave [X] · +N líneas
    #  Nombre    Puntos  Dificultad  Fecha
    1  ...
 ```
@@ -68,8 +78,11 @@
 - **Clave**: toggle binario; la selección activa resalta en azul.
 - **Armadura**: dropdown con 14 opciones (Aleatoria, Do mayor, 1-6♯, 1-6♭).
 - **Dificultad**: 4 botones; el activo resalta en púrpura.
-- **Modo**: toggle binario; Práctica en verde, Contrarreloj en rojo.
-- El leaderboard preview se actualiza en tiempo real al cambiar cualquier opción.
+- **Tipo de juego**: toggle binario; Práctica en verde, Contrarreloj en rojo. Sin cambios respecto a v1.
+- **Enfoque**: toggle binario; Velocidad en azul neutro, Ritmo en naranja.
+- Cuando Ritmo está activo, aparece el slider de BPM (rango 40–200, paso 10, default 120).
+- La nota "Acelera +10 BPM cada 16 notas" solo se muestra en la combinación Contrarreloj + Ritmo.
+- El leaderboard preview se actualiza en tiempo real al cambiar cualquier opción (incluido BPM).
 - El botón "Jugar" inicializa el `AudioContext` (obligatorio por política de navegador).
 
 ---
@@ -113,14 +126,37 @@
 
 ### Barra de estado superior
 
-- **Modo práctica**: indicador `Nota N / 16` a la derecha; barra de progreso azul.
-- **Modo contrarreloj**: temporizador `XX.Xs` en centro (verde → amarillo → rojo); contador de aciertos a la derecha; barra que refleja el tiempo restante.
+- **Práctica + Velocidad**: indicador `Nota N / 16` a la derecha; barra de progreso azul.
+- **Contrarreloj + Velocidad**: temporizador `XX.Xs` en centro (verde → amarillo → rojo); contador de aciertos a la derecha; barra que refleja el tiempo restante.
+- **Práctica + Ritmo**: BPM centrado `♩ = 120`; indicador de notas a la derecha; barra de progreso azul.
+- **Contrarreloj + Ritmo**: timer a la izquierda + BPM en centro `♩ = 120`; aciertos a la derecha. El BPM hace flash amarillo durante 1 beat cuando sube.
+
+### Beat progress bar (solo Enfoque Ritmo)
+
+Una barra fina (2–3 px) en color ámbar, separada de la barra de progreso principal, que se rellena suavemente de izquierda a derecha dentro de cada ventana de beat usando `requestAnimationFrame`. Se reinicia en cada pulso. Sirve como guía visual del tempo — el jugador anticipa el beat antes de que llegue.
+
+```
+[████████████░░░░░░░░░░░░]  ← avanza, se reinicia cada beat
+```
+
+### Feedback en Enfoque Ritmo
+
+Se añade la calificación de sincronización a la línea de feedback:
+```
+✔ Correcto · +2,847 pts · 🎯 Perfecto    (timingAccuracy > 0.85)
+✔ Correcto · +1,923 pts · 👍 Bien         (0.50 – 0.85)
+✔ Correcto · +891 pts  · ⏰ Tarde         (< 0.50)
+✘ Miss — Era E (Mi)                       (beat avanzó sin respuesta correcta)
+```
+
+En Contrarreloj + Ritmo, en lugar de `+3,241 pts` se muestra el bono de tiempo: `+2.7s`.
 
 ### Input
 
 - **Teclado físico**: teclas A-G capturadas globalmente (sin necesidad de focus); se ignoran repeticiones de tecla mantenida.
 - **Botones virtuales**: fila fija al final de la pantalla; `onClick` llama al mismo handler.
-- La tecla de acierto no avanza hasta que la nota es correcta; los errores restan puntos pero no avanzan.
+- **Velocidad**: la tecla de acierto avanza la nota; los errores restan puntos pero no avanzan.
+- **Ritmo**: la tecla de acierto registra el intento pero **no avanza la nota** — el beat lo hace. Los errores dentro de la ventana no penalizan y se puede reintentar hasta el siguiente beat.
 
 ---
 
@@ -137,9 +173,9 @@
 └───────────────────────────────────────────────────────────────────────┘
        (en contrarreloj: un pentagrama adicional por cada 16 notas)
 
-        🎯   (o ⏱ en contrarreloj)
+        🎯   (o ⏱ en contrarreloj / 🎵 en ritmo)
     Ronda completada
-    𝄞 Sol · Básico
+    𝄞 Sol · Básico   (en ritmo: + "· ♩ = 120 → 150")
 
         -1,060,738    puntos
     ┌──────┐ ┌──────┐ ┌──────┐
@@ -147,13 +183,21 @@
     │Correct│ │Errores│ │T/nota│
     └──────┘ └──────┘ └──────┘
 
+  (en Enfoque Ritmo: 4 stats, añade precisión)
+    ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐
+    │  38  │ │  10  │ │ 0.4s │ │  87% │
+    │Aciert│ │Misses│ │T/nota│ │Precis│
+    └──────┘ └──────┘ └──────┘ └──────┘
+    Tempo máximo: 150 BPM
+
   ┌── Nuevo récord ────────────────┐
   │ 🏆 ¡Nuevo récord!              │
   │ 12,450 pts — ingresa tu nombre │
   │ [____________] [ Guardar ]     │
   └────────────────────────────────┘
 
-  TOP 5 — PRÁCTICA
+  TOP 5 — PRÁCTICA                     (Velocidad)
+  TOP 5 — CONTRARRELOJ · RITMO · ♩=120 (Ritmo, incluye BPM inicial)
   #  Nombre    Puntos     Dificultad  Fecha
   1  Fercho   12,450     +0 líneas   5/6/2026   ← resaltado en amarillo
 
@@ -164,10 +208,18 @@
 
 - El pentagrama aparece **encima** del score y las estadísticas, a ancho completo (`max-w-5xl`), igual que durante el juego.
 - Cada nota se muestra con su posición real en el pentagrama (misma clave, armadura y dificultad de la ronda).
-- **Verde** (`correct`) = respondida correctamente. **Rojo** (`wrong`) = respondida incorrectamente.
+- **Verde** (`correct`) = respondida correctamente. **Rojo** (`wrong`) = respondida incorrectamente (o miss en modo ritmo).
 - En **práctica** (16 notas fijas): un solo pentagrama.
 - En **contrarreloj** (secuencias ilimitadas): un pentagrama por cada bloque de 16 notas respondidas, apilados verticalmente.
 - No se muestra el indicador azul de posición activa ni el anillo pulsante.
+
+### Variaciones en Enfoque Ritmo
+
+- **Emoji**: 🎵 en lugar de 🎯 / ⏱
+- **Subtítulo**: `𝄞 Sol · Básico · ♩ = 120 → 150` (rango BPM recorrido)
+- **Stats**: 4 cards — Aciertos | Misses | T/nota | Precisión rítmica %
+- **Tempo máximo**: línea adicional debajo de los stats mostrando el BPM más alto alcanzado
+- **Título leaderboard**: incluye BPM inicial — `TOP 5 — PRÁCTICA · RITMO · ♩ = 120`
 
 ### Detalles
 
@@ -196,6 +248,7 @@
 | Dificultad | `#9333ea` (purple-600) | Selector de dificultad |
 | Práctica | `#16a34a` (green-600) | Modo práctica |
 | Contrarreloj | `#dc2626` (red-600) | Modo contrarreloj |
+| Ritmo | `#ea580c` (orange-600) | Enfoque ritmo, beat progress bar, BPM display |
 | Correcto | `#4ade80` (green-400) | Nota verde, feedback ok |
 | Error | `#f87171` (red-400) | Nota roja, feedback error |
 | Récord | `#d97706` (yellow-600) | Fila destacada en leaderboard |

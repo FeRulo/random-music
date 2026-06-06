@@ -74,6 +74,29 @@ Crear una aplicación web que convierta el ejercicio de lectura musical en un ju
 - Se usa la misma clave, armadura y dificultad de la ronda jugada, de modo que el jugador pueda identificar visualmente los patrones o regiones del pentagrama donde cometió errores.
 - En modo contrarreloj (donde la secuencia se regenera cada 16 notas), se muestra un pentagrama por cada bloque de 16 notas respondidas, apilados verticalmente.
 
+### RF-09 · Enfoque Ritmo — metrónomo y avance automático
+
+El menú añade un segundo selector **Enfoque**: Velocidad (comportamiento actual, sin cambios) | Ritmo (nuevo).
+Aplica a ambos tipos de juego (Práctica y Contrarreloj).
+
+- Un metrónomo suena en background a un BPM configurable (40–200, paso 10, default 120 = 500ms/nota).
+- El beat 1 de cada compás (4/4) suena más fuerte que los beats 2–4.
+- Cada beat define la **ventana de nota**: el jugador debe identificar la nota activa pulsando la tecla correcta antes del siguiente beat.
+- Si el tiempo se agota sin respuesta correcta, la nota avanza automáticamente (**miss**, 0 puntos).
+- Teclas incorrectas dentro de la ventana no penalizan puntos; el jugador puede reintentar hasta que llegue el beat.
+- Score en **Práctica + Ritmo**: suma acumulada de `(baseDelta × timingAccuracy)` por acierto, donde `timingAccuracy` mide qué tan cerca del beat se presionó la tecla correcta (1.0 = perfecto, 0.0 = límite de ventana).
+- Score en **Contrarreloj + Ritmo**: número de aciertos (igual que Contrarreloj + Velocidad); el bono de tiempo se otorga en proporción a la precisión rítmica (`bonusTime = timingAccuracy × 3s`).
+- Las claves de leaderboard de Velocidad no cambian; Ritmo usa claves distintas que incluyen el BPM inicial, para que comparaciones sean justas.
+
+### RF-10 · Aceleración de tempo en Contrarreloj + Ritmo
+
+Exclusivo de la combinación Contrarreloj + Ritmo.
+
+- Cada 16 notas procesadas (aciertos y misses), el BPM sube automáticamente `+10`.
+- Al subir: flash visual de 1 beat en el display de BPM, y señal sonora de dos tonos breves ascendentes.
+- El techo de aceleración es 220 BPM (sin límite de inicio: el jugador configura el BPM inicial).
+- A mayor BPM la ventana de nota se contrae y el bono de tiempo por nota es menor → dificultad creciente orgánica.
+
 ---
 
 ## Requisitos no funcionales
