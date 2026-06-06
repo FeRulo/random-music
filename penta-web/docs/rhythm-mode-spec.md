@@ -41,7 +41,8 @@ A cada beat del metrónomo corresponde exactamente una nota activa. La ventana d
 ```
 beatWindowMs = 60000 / bpm
 
-A 60 BPM  → 1000ms / nota
+A  30 BPM → 2000ms / nota
+A  60 BPM → 1000ms / nota
 A 120 BPM →  500ms / nota
 A 180 BPM →  333ms / nota
 ```
@@ -71,6 +72,9 @@ finalScore = round(sum(noteScore))        // suma de todas las notas de la ronda
 
 El multiplicador `bpm / 60` normaliza el score respecto al tempo: una nota a 120 BPM vale el doble que a 60 BPM porque el jugador tuvo la mitad de tiempo. Esto hace los leaderboards significativos — el BPM inicial es parte de la clave para que comparaciones sean justas.
 
+Ejemplo a 30 BPM (default), difficulty 0, timing perfecto:
+`baseDelta = 900 × 0.5 = 450 pts/nota → 16 notas = 7,200 pts máximo`
+
 Ejemplo a 120 BPM, difficulty 0, timing perfecto:
 `baseDelta = 900 × 2 = 1800 pts/nota → 16 notas = 28,800 pts máximo`
 
@@ -92,7 +96,7 @@ Techo:   220 BPM (hardcoded)
 Señal:   flash visual 1 beat + dos tonos ascendentes breves
 ```
 
-Progresión ejemplo empezando en 120 BPM: 120 → 130 → 140 → 150 → … hasta 220.
+Progresión ejemplo empezando en 30 BPM (default): 30 → 40 → 50 → 60 → … hasta 220.
 
 La aceleración es imperceptible como cambio de intervalo (10 BPM de diferencia a 120 = 42ms más rápido por nota), pero se va acumulando. El jugador la siente como una presión creciente, no como saltos abruptos.
 
@@ -104,7 +108,7 @@ La aceleración es imperceptible como cambio de intervalo (10 BPM de diferencia 
 
 ```typescript
 rhythmMode: boolean;        // false = velocidad (sin cambios), true = ritmo
-ritmoBpm: number;           // BPM inicial: 40–200, default 120 (= 500ms/nota)
+ritmoBpm: number;           // BPM inicial: 20–200, default 30 (= 2000ms/nota)
 ritmoAccelStep: number;     // BPM por bloque de 16 notas, default 10
 ```
 
@@ -117,6 +121,7 @@ ritmoBpmCurrent: number;         // BPM vivo (sube durante la partida en countdo
 ritmoBeatCount: number;          // beats disparados desde el inicio de la partida
 ritmoScore: number;              // score acumulado (Práctica + Ritmo)
 ritmoBpmJustIncreased: boolean;  // true durante un beat tras la subida → flash UI
+ritmoPrep: number;               // beats de preparación restantes (4 → 0); mientras > 0 no avanza la lógica de juego
 ```
 
 ### Campo adicional en `AnsweredNote`
@@ -187,8 +192,8 @@ Ejemplo: `rmusic_lb_countdown_rhythm_treble_sharp3_1_120bpm`
 ### Nuevas constantes
 
 ```typescript
-RITMO_BPM_DEFAULT       = 120   // 500ms por nota, 2 beats/s
-RITMO_BPM_MIN           = 40
+RITMO_BPM_DEFAULT       = 30    // 2000ms por nota, 0.5 beats/s
+RITMO_BPM_MIN           = 20    // 3000ms por nota
 RITMO_BPM_MAX           = 200   // máximo configurable en menú
 RITMO_BPM_MAX_GAMEPLAY  = 220   // techo durante aceleración
 RITMO_BPM_STEP          = 10
@@ -221,6 +226,8 @@ BPM INICIAL — ♩ = 120
 ```
 
 ### GameScreen (modo ritmo)
+
+**Preparación:** Los primeros 4 beats son de preparación. Durante este tiempo el metrónomo ya suena, la barra de beat anima y se muestra una cuenta regresiva grande (4 → 3 → 2 → 1). Las teclas no tienen efecto. Al llegar a 0, comienza la partida.
 
 **Header:** BPM centrado donde iría el timer (en countdown también se ve el timer a la izquierda del BPM).
 

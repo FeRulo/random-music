@@ -50,6 +50,7 @@ function makeInitialState(): GameState {
     ritmoScore: 0,
     ritmoBpmJustIncreased: false,
     ritmoCurrentAnswer: null,
+    ritmoPrep: 0,
   };
 }
 
@@ -85,6 +86,7 @@ function reducer(state: GameState, action: Action): GameState {
         countdownStartTime: now,
         countdownSecondsLeft: COUNTDOWN_START_SECONDS,
         ritmoBpmCurrent: settings.ritmoBpm,
+        ritmoPrep: settings.rhythmMode ? 4 : 0,
       };
     }
 
@@ -96,6 +98,7 @@ function reducer(state: GameState, action: Action): GameState {
 
       // --- Rhythm mode ---
       if (settings.rhythmMode) {
+        if (state.ritmoPrep > 0) return state; // ignore keypresses during prep
         const correct = key === currentNote.letter;
 
         if (!correct) {
@@ -106,32 +109,12 @@ function reducer(state: GameState, action: Action): GameState {
         // Ignore if already answered correctly this beat
         if (state.ritmoCurrentAnswer !== null) return state;
 
-        const responseMs = now - state.noteStartTime;
-        const beatWindowMs = 60000 / state.ritmoBpmCurrent;
-        const timingAccuracy = calcTimingAccuracy(Math.abs(responseMs), beatWindowMs);
-
         playNoteFrequency(currentNote.staffIndex, settings.difficulty, settings.clef);
 
-        if (settings.mode === 'countdown') {
-          const bonusTime = timingAccuracy * 3;
-          const newSeconds = Math.min(
-            state.countdownSecondsLeft + bonusTime,
-            COUNTDOWN_START_SECONDS * 2,
-          );
-          return {
-            ...state,
-            ritmoCurrentAnswer: { timingAccuracy, responseTimeMs: now - state.noteStartTime },
-            countdownSecondsLeft: newSeconds,
-            countdownCorrect: state.countdownCorrect + 1,
-          };
-        }
-
-        // Practice + Rhythm: accumulate score
-        const baseDelta = (900 + 100 * settings.difficulty) * (state.ritmoBpmCurrent / 60);
+        // Store press time; accuracy is calculated in BEAT using the actual beat wall time
         return {
           ...state,
-          ritmoCurrentAnswer: { timingAccuracy, responseTimeMs: now - state.noteStartTime },
-          ritmoScore: state.ritmoScore + baseDelta * timingAccuracy,
+          ritmoCurrentAnswer: { pressWallTime: now, responseTimeMs: now - state.noteStartTime },
         };
       }
 
@@ -146,6 +129,7 @@ function reducer(state: GameState, action: Action): GameState {
         correct,
         delta,
         timingAccuracy: null,
+        timingOffsetMs: null,
         missed: false,
       };
 
@@ -224,7 +208,32 @@ function reducer(state: GameState, action: Action): GameState {
       if (state.phase !== 'playing' || !state.settings.rhythmMode) return state;
 
       const { beatWallTime, beatIndex } = action;
+
+      // Consume prep beats without advancing game logic
+      if (state.ritmoPrep > 0) {
+        return { ...state, ritmoPrep: state.ritmoPrep - 1, noteStartTime: beatWallTime };
+      }
+
       const currentNote = state.noteSequence[state.currentIndex];
+
+      const beatWindowMs = 60000 / state.ritmoBpmCurrent;
+      let timingAccuracy: number | null = null;
+      let countdownBonus = 0;
+      let ritmoScoreDelta = 0;
+
+      let timingOffsetMs: number | null = null;
+      if (state.ritmoCurrentAnswer) {
+        // Accuracy = how close the keypress was to THIS beat (the one that just fired)
+        timingOffsetMs = Math.abs(state.ritmoCurrentAnswer.pressWallTime - beatWallTime);
+        timingAccuracy = calcTimingAccuracy(timingOffsetMs, beatWindowMs);
+
+        if (state.settings.mode === 'countdown') {
+          countdownBonus = timingAccuracy * 3;
+        } else {
+          const baseDelta = (900 + 100 * state.settings.difficulty) * (state.ritmoBpmCurrent / 60);
+          ritmoScoreDelta = baseDelta * timingAccuracy;
+        }
+      }
 
       const answeredNote: AnsweredNote = state.ritmoCurrentAnswer
         ? {
@@ -232,7 +241,8 @@ function reducer(state: GameState, action: Action): GameState {
             responseTimeMs: state.ritmoCurrentAnswer.responseTimeMs,
             correct: true,
             delta: 0,
-            timingAccuracy: state.ritmoCurrentAnswer.timingAccuracy,
+            timingAccuracy,
+            timingOffsetMs,
             missed: false,
           }
         : {
@@ -241,12 +251,18 @@ function reducer(state: GameState, action: Action): GameState {
             correct: false,
             delta: 0,
             timingAccuracy: null,
+            timingOffsetMs: null,
             missed: true,
           };
 
       const newAnswered = [...state.answered, answeredNote];
       const newIndex = state.currentIndex + 1;
       const newBeatCount = state.ritmoBeatCount + 1;
+      const newCountdownCorrect = state.countdownCorrect + (state.ritmoCurrentAnswer ? 1 : 0);
+      const newCountdownSeconds = Math.min(
+        state.countdownSecondsLeft + countdownBonus,
+        COUNTDOWN_START_SECONDS * 2,
+      );
 
       // BPM acceleration — countdown only, every 16 beats
       let newBpm = state.ritmoBpmCurrent;
@@ -265,6 +281,9 @@ function reducer(state: GameState, action: Action): GameState {
         ritmoBpmCurrent: newBpm,
         ritmoBpmJustIncreased: bpmJustIncreased,
         ritmoCurrentAnswer: null as null,
+        ritmoScore: state.ritmoScore + ritmoScoreDelta,
+        countdownCorrect: newCountdownCorrect,
+        countdownSecondsLeft: newCountdownSeconds,
         noteStartTime: beatWallTime,
       };
 
@@ -276,7 +295,7 @@ function reducer(state: GameState, action: Action): GameState {
           ...base,
           currentIndex: newIndex,
           phase: 'result',
-          finalScore: Math.round(state.ritmoScore),
+          finalScore: Math.round(base.ritmoScore),
         };
       }
 
@@ -306,7 +325,7 @@ function reducer(state: GameState, action: Action): GameState {
     }
 
     case 'RESET':
-      return makeInitialState();
+      return { ...makeInitialState(), settings: state.settings };
 
     default:
       return state;

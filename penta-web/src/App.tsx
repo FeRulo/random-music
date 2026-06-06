@@ -7,7 +7,7 @@ export default function App() {
   const { state, startGame, pressKey, beat, tick, reset } = useGameEngine();
 
   if (state.phase === 'menu') {
-    return <MainMenu onStart={startGame} />;
+    return <MainMenu onStart={startGame} initialSettings={state.settings} />;
   }
 
   if (state.phase === 'playing') {

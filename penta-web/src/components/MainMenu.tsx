@@ -13,6 +13,7 @@ import Leaderboard from './Leaderboard';
 
 interface Props {
   onStart: (settings: GameSettings) => void;
+  initialSettings?: GameSettings;
 }
 
 const KEY_SIG_OPTIONS = [
@@ -22,13 +23,25 @@ const KEY_SIG_OPTIONS = [
   ...([1,2,3,4,5,6].map(n => ({ label: `${n}♭`, accidental: 'flat' as Accidental, count: n, random: false }))),
 ];
 
-export default function MainMenu({ onStart }: Props) {
-  const [clef, setClef] = useState<Clef>('bass');
-  const [keySigIdx, setKeySigIdx] = useState(0);
-  const [difficulty, setDifficulty] = useState<0|1|2|3>(0);
-  const [mode, setMode] = useState<GameMode>('practice');
-  const [rhythmMode, setRhythmMode] = useState(false);
-  const [ritmoBpm, setRitmoBpm] = useState(RITMO_BPM_DEFAULT);
+function findKeySigIdx(ks: { accidental: Accidental; count: number }, random: boolean): number {
+  if (random) return 0;
+  const idx = KEY_SIG_OPTIONS.findIndex(
+    o => !o.random && o.accidental === ks.accidental && o.count === ks.count,
+  );
+  return idx >= 0 ? idx : 1; // fallback to Do mayor
+}
+
+export default function MainMenu({ onStart, initialSettings }: Props) {
+  const [clef, setClef] = useState<Clef>(initialSettings?.clef ?? 'bass');
+  const [keySigIdx, setKeySigIdx] = useState(() =>
+    initialSettings
+      ? findKeySigIdx(initialSettings.keySignature, initialSettings.randomKeySignature)
+      : 0,
+  );
+  const [difficulty, setDifficulty] = useState<0|1|2|3>(initialSettings?.difficulty ?? 0);
+  const [mode, setMode] = useState<GameMode>(initialSettings?.mode ?? 'practice');
+  const [rhythmMode, setRhythmMode] = useState(initialSettings?.rhythmMode ?? false);
+  const [ritmoBpm, setRitmoBpm] = useState(initialSettings?.ritmoBpm ?? RITMO_BPM_DEFAULT);
 
   const selectedKeySig = KEY_SIG_OPTIONS[keySigIdx];
 

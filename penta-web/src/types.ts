@@ -30,6 +30,7 @@ export interface AnsweredNote {
   correct: boolean;
   delta: number;
   timingAccuracy: number | null; // 0.0–1.0 in rhythm mode, null in velocity
+  timingOffsetMs: number | null; // |pressWallTime - beatWallTime| in ms, null in velocity/miss
   missed: boolean;               // true = beat arrived without a correct answer
 }
 
@@ -51,7 +52,8 @@ export interface GameState {
   ritmoBeatCount: number;
   ritmoScore: number;              // accumulated score for Practice + Rhythm
   ritmoBpmJustIncreased: boolean;  // true for one beat after a BPM increase → UI flash
-  ritmoCurrentAnswer: { timingAccuracy: number; responseTimeMs: number } | null;
+  ritmoCurrentAnswer: { pressWallTime: number; responseTimeMs: number } | null;
+  ritmoPrep: number;               // prep beats remaining before gameplay starts (counts 4→0)
 }
 
 export interface LeaderboardEntry {

@@ -93,7 +93,7 @@ export default function GameScreen({ state, onKey, onBeat, onTick, onMenu }: Pro
     countdownSecondsLeft > 7  ? '#facc15' : '#f87171';
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-950 to-gray-900 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-b from-gray-950 to-gray-900 flex flex-col relative">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
         <div className="flex items-center gap-3">
@@ -198,9 +198,55 @@ export default function GameScreen({ state, onKey, onBeat, onTick, onMenu }: Pro
         />
       </div>
 
+      {/* Prep countdown overlay (rhythm mode) */}
+      {isRhythm && state.ritmoPrep > 0 && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+          <span
+            key={state.ritmoPrep}
+            className="text-8xl font-bold text-white opacity-80 animate-ping"
+            style={{ animationDuration: '0.6s', animationIterationCount: 1 }}
+          >
+            {state.ritmoPrep}
+          </span>
+        </div>
+      )}
+
+      {/* Timing delta (rhythm mode) — shown large below staff */}
+      {isRhythm && !state.ritmoPrep && (
+        <div className="text-center h-16 flex flex-col items-center justify-center gap-0.5">
+          {(() => {
+            const last = answered.length > 0 ? answered[answered.length - 1] : null;
+            if (!last) return <span className="text-gray-700 text-4xl font-mono font-bold">—</span>;
+            const noteName = `${last.note.letter} (${SOLFEO[last.note.letter]})`;
+            if (last.missed) return (
+              <>
+                <span className="text-red-400 text-4xl font-mono font-bold">miss</span>
+                <span className="text-gray-500 text-sm">{noteName}</span>
+              </>
+            );
+            if (last.timingOffsetMs !== null) {
+              const ms = Math.round(last.timingOffsetMs);
+              const emoji = timingLabel(last.timingAccuracy!).split(' ')[0];
+              const color =
+                last.timingAccuracy! > 0.85 ? 'text-green-400' :
+                last.timingAccuracy! >= 0.5  ? 'text-yellow-400' : 'text-red-400';
+              return (
+                <>
+                  <span className={`${color} text-4xl font-mono font-bold`}>{emoji} {ms}ms</span>
+                  <span className="text-gray-500 text-sm">{noteName}</span>
+                </>
+              );
+            }
+            return <span className="text-gray-700 text-4xl font-mono font-bold">—</span>;
+          })()}
+        </div>
+      )}
+
       {/* Current note hint */}
-      <div className="text-center py-2">
-        {isRhythm ? (
+      <div className="text-center py-1">
+        {isRhythm && state.ritmoPrep > 0 ? (
+          <p className="text-orange-400 text-sm font-medium">Prepárate…</p>
+        ) : isRhythm ? (
           <p className="text-gray-600 text-xs">Presiona la tecla correcta antes del siguiente beat</p>
         ) : (
           <p className="text-gray-600 text-xs">Identifica la nota activa (azul)</p>

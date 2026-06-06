@@ -3,8 +3,14 @@ import type { LeaderboardEntry } from '../types';
 const BASE = 'http://localhost:3001/api';
 
 function extractParts(key: string): { mode: string; clef: string; keySig: string; difficulty: string } {
-  // key format: rmusic_lb_{mode}_{clef}_{keySig}_{difficulty}
-  const [mode, clef, keySig, difficulty] = key.slice('rmusic_lb_'.length).split('_');
+  const parts = key.slice('rmusic_lb_'.length).split('_');
+  // Rhythm key: rmusic_lb_{mode}_rhythm_{clef}_{keySig}_{difficulty}_{bpm}bpm
+  if (parts[1] === 'rhythm') {
+    const [mode, , clef, keySig, difficulty, bpmPart] = parts;
+    return { mode: `${mode}_rhythm_${bpmPart}`, clef, keySig, difficulty };
+  }
+  // Velocity key: rmusic_lb_{mode}_{clef}_{keySig}_{difficulty}
+  const [mode, clef, keySig, difficulty] = parts;
   return { mode, clef, keySig, difficulty };
 }
 
