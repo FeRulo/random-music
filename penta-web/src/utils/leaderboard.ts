@@ -3,12 +3,15 @@ import type { GameSettings, LeaderboardEntry } from '../types';
 import { apiLoadLeaderboard } from './leaderboardApi';
 
 export function getLeaderboardKey(settings: GameSettings): string {
-  const { mode, clef, keySignature, difficulty, randomKeySignature } = settings;
+  const { mode, clef, keySignature, difficulty, randomKeySignature, rhythmMode, ritmoBpm } = settings;
   const keySig = randomKeySignature
     ? 'random'
     : keySignature.accidental === 'none'
       ? 'none'
       : `${keySignature.accidental}${keySignature.count}`;
+  if (rhythmMode) {
+    return `${LEADERBOARD_KEY_PREFIX}${mode}_rhythm_${clef}_${keySig}_${difficulty}_${ritmoBpm}bpm`;
+  }
   return `${LEADERBOARD_KEY_PREFIX}${mode}_${clef}_${keySig}_${difficulty}`;
 }
 

@@ -1,5 +1,12 @@
 import { useCallback, useReducer } from 'react';
-import { NOTES_PER_ROUND, COUNTDOWN_START_SECONDS, COUNTDOWN_BONUS_THRESHOLD_S } from '../constants';
+import {
+  NOTES_PER_ROUND,
+  COUNTDOWN_START_SECONDS,
+  COUNTDOWN_BONUS_THRESHOLD_S,
+  RITMO_BPM_DEFAULT,
+  RITMO_ACCEL_STEP_DEFAULT,
+  RITMO_BPM_MAX_GAMEPLAY,
+} from '../constants';
 import { buildNotePool } from '../utils/noteMapping';
 import { generateNoteSequence } from '../utils/noteGenerator';
 import { randomKeySignature } from '../utils/keySignature';
@@ -9,6 +16,7 @@ import type { GameState, GameSettings, AnsweredNote } from '../types';
 type Action =
   | { type: 'START_GAME'; settings: GameSettings }
   | { type: 'KEY_PRESSED'; key: string; now: number }
+  | { type: 'BEAT'; beatWallTime: number; beatIndex: number }
   | { type: 'TICK'; now: number }
   | { type: 'RESET' };
 
@@ -18,6 +26,9 @@ const defaultSettings: GameSettings = {
   randomKeySignature: false,
   difficulty: 0,
   mode: 'practice',
+  rhythmMode: false,
+  ritmoBpm: RITMO_BPM_DEFAULT,
+  ritmoAccelStep: RITMO_ACCEL_STEP_DEFAULT,
 };
 
 function makeInitialState(): GameState {
@@ -34,12 +45,23 @@ function makeInitialState(): GameState {
     countdownStartTime: 0,
     countdownCorrect: 0,
     finalScore: null,
+    ritmoBpmCurrent: RITMO_BPM_DEFAULT,
+    ritmoBeatCount: 0,
+    ritmoScore: 0,
+    ritmoBpmJustIncreased: false,
+    ritmoCurrentAnswer: null,
   };
 }
 
 function calcDelta(difficulty: number, responseMs: number): number {
   const secs = Math.max(responseMs / 1000, 0.05);
   return (900 + 100 * difficulty) / secs;
+}
+
+function calcTimingAccuracy(timingOffsetMs: number, beatWindowMs: number): number {
+  const graceZone = beatWindowMs * 0.5;
+  if (timingOffsetMs <= graceZone) return 1.0;
+  return Math.max(0, 1 - (timingOffsetMs - graceZone) / graceZone);
 }
 
 function reducer(state: GameState, action: Action): GameState {
@@ -62,31 +84,78 @@ function reducer(state: GameState, action: Action): GameState {
         practiceGameStartTime: now,
         countdownStartTime: now,
         countdownSecondsLeft: COUNTDOWN_START_SECONDS,
+        ritmoBpmCurrent: settings.ritmoBpm,
       };
     }
 
     case 'KEY_PRESSED': {
       if (state.phase !== 'playing') return state;
       const { key, now } = action;
+      const { settings } = state;
       const currentNote = state.noteSequence[state.currentIndex];
+
+      // --- Rhythm mode ---
+      if (settings.rhythmMode) {
+        const correct = key === currentNote.letter;
+
+        if (!correct) {
+          playWrong();
+          return state; // wrong key: sound only, no state change
+        }
+
+        // Ignore if already answered correctly this beat
+        if (state.ritmoCurrentAnswer !== null) return state;
+
+        const responseMs = now - state.noteStartTime;
+        const beatWindowMs = 60000 / state.ritmoBpmCurrent;
+        const timingAccuracy = calcTimingAccuracy(Math.abs(responseMs), beatWindowMs);
+
+        playNoteFrequency(currentNote.staffIndex, settings.difficulty, settings.clef);
+
+        if (settings.mode === 'countdown') {
+          const bonusTime = timingAccuracy * 3;
+          const newSeconds = Math.min(
+            state.countdownSecondsLeft + bonusTime,
+            COUNTDOWN_START_SECONDS * 2,
+          );
+          return {
+            ...state,
+            ritmoCurrentAnswer: { timingAccuracy, responseTimeMs: now - state.noteStartTime },
+            countdownSecondsLeft: newSeconds,
+            countdownCorrect: state.countdownCorrect + 1,
+          };
+        }
+
+        // Practice + Rhythm: accumulate score
+        const baseDelta = (900 + 100 * settings.difficulty) * (state.ritmoBpmCurrent / 60);
+        return {
+          ...state,
+          ritmoCurrentAnswer: { timingAccuracy, responseTimeMs: now - state.noteStartTime },
+          ritmoScore: state.ritmoScore + baseDelta * timingAccuracy,
+        };
+      }
+
+      // --- Velocity mode (original logic) ---
       const responseMs = now - state.noteStartTime;
       const correct = key === currentNote.letter;
-      const delta = calcDelta(state.settings.difficulty, responseMs);
+      const delta = calcDelta(settings.difficulty, responseMs);
 
       const answeredNote: AnsweredNote = {
         note: currentNote,
         responseTimeMs: responseMs,
         correct,
         delta,
+        timingAccuracy: null,
+        missed: false,
       };
 
       if (correct) {
-        playNoteFrequency(currentNote.staffIndex, state.settings.difficulty, state.settings.clef);
+        playNoteFrequency(currentNote.staffIndex, settings.difficulty, settings.clef);
       } else {
         playWrong();
       }
 
-      if (state.settings.mode === 'practice') {
+      if (settings.mode === 'practice') {
         const newPoints = correct
           ? state.practicePoints + delta
           : state.practicePoints - delta;
@@ -115,7 +184,7 @@ function reducer(state: GameState, action: Action): GameState {
           noteStartTime: correct ? now : state.noteStartTime,
         };
       } else {
-        // Countdown mode
+        // Countdown + Velocity
         let newSeconds = state.countdownSecondsLeft;
         const newCorrect = state.countdownCorrect + (correct ? 1 : 0);
         if (correct) {
@@ -127,8 +196,7 @@ function reducer(state: GameState, action: Action): GameState {
         const newAnswered = [...state.answered, answeredNote];
 
         if (newIndex >= NOTES_PER_ROUND) {
-          // Generate a new sequence seamlessly
-          const pool = buildNotePool(state.settings.clef, state.settings.difficulty);
+          const pool = buildNotePool(settings.clef, settings.difficulty);
           const newSeq = generateNoteSequence(pool, NOTES_PER_ROUND);
           return {
             ...state,
@@ -150,6 +218,81 @@ function reducer(state: GameState, action: Action): GameState {
           noteStartTime: correct ? now : state.noteStartTime,
         };
       }
+    }
+
+    case 'BEAT': {
+      if (state.phase !== 'playing' || !state.settings.rhythmMode) return state;
+
+      const { beatWallTime, beatIndex } = action;
+      const currentNote = state.noteSequence[state.currentIndex];
+
+      const answeredNote: AnsweredNote = state.ritmoCurrentAnswer
+        ? {
+            note: currentNote,
+            responseTimeMs: state.ritmoCurrentAnswer.responseTimeMs,
+            correct: true,
+            delta: 0,
+            timingAccuracy: state.ritmoCurrentAnswer.timingAccuracy,
+            missed: false,
+          }
+        : {
+            note: currentNote,
+            responseTimeMs: 0,
+            correct: false,
+            delta: 0,
+            timingAccuracy: null,
+            missed: true,
+          };
+
+      const newAnswered = [...state.answered, answeredNote];
+      const newIndex = state.currentIndex + 1;
+      const newBeatCount = state.ritmoBeatCount + 1;
+
+      // BPM acceleration — countdown only, every 16 beats
+      let newBpm = state.ritmoBpmCurrent;
+      let bpmJustIncreased = false;
+      if (state.settings.mode === 'countdown' && beatIndex > 0 && beatIndex % 16 === 0) {
+        newBpm = Math.min(
+          state.ritmoBpmCurrent + state.settings.ritmoAccelStep,
+          RITMO_BPM_MAX_GAMEPLAY,
+        );
+        bpmJustIncreased = newBpm !== state.ritmoBpmCurrent;
+      }
+
+      const base = {
+        answered: newAnswered,
+        ritmoBeatCount: newBeatCount,
+        ritmoBpmCurrent: newBpm,
+        ritmoBpmJustIncreased: bpmJustIncreased,
+        ritmoCurrentAnswer: null as null,
+        noteStartTime: beatWallTime,
+      };
+
+      // Practice: end after NOTES_PER_ROUND
+      if (state.settings.mode === 'practice' && newIndex >= NOTES_PER_ROUND) {
+        playGameOver();
+        return {
+          ...state,
+          ...base,
+          currentIndex: newIndex,
+          phase: 'result',
+          finalScore: Math.round(state.ritmoScore),
+        };
+      }
+
+      // Countdown: generate new sequence when round complete
+      if (state.settings.mode === 'countdown' && newIndex >= NOTES_PER_ROUND) {
+        const pool = buildNotePool(state.settings.clef, state.settings.difficulty);
+        const newSeq = generateNoteSequence(pool, NOTES_PER_ROUND);
+        return {
+          ...state,
+          ...base,
+          currentIndex: 0,
+          noteSequence: newSeq,
+        };
+      }
+
+      return { ...state, ...base, currentIndex: newIndex };
     }
 
     case 'TICK': {
@@ -181,6 +324,10 @@ export function useGameEngine() {
     dispatch({ type: 'KEY_PRESSED', key, now: performance.now() });
   }, []);
 
+  const beat = useCallback((beatWallTime: number, beatIndex: number) => {
+    dispatch({ type: 'BEAT', beatWallTime, beatIndex });
+  }, []);
+
   const tick = useCallback(() => {
     dispatch({ type: 'TICK', now: performance.now() });
   }, []);
@@ -189,5 +336,5 @@ export function useGameEngine() {
     dispatch({ type: 'RESET' });
   }, []);
 
-  return { state, startGame, pressKey, tick, reset };
+  return { state, startGame, pressKey, beat, tick, reset };
 }

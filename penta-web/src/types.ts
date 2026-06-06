@@ -14,6 +14,9 @@ export interface GameSettings {
   randomKeySignature: boolean;
   difficulty: 0 | 1 | 2 | 3;
   mode: GameMode;
+  rhythmMode: boolean;
+  ritmoBpm: number;       // initial BPM (40–200)
+  ritmoAccelStep: number; // BPM added every 16 notes in countdown
 }
 
 export interface NotePosition {
@@ -26,6 +29,8 @@ export interface AnsweredNote {
   responseTimeMs: number;
   correct: boolean;
   delta: number;
+  timingAccuracy: number | null; // 0.0–1.0 in rhythm mode, null in velocity
+  missed: boolean;               // true = beat arrived without a correct answer
 }
 
 export interface GameState {
@@ -33,7 +38,7 @@ export interface GameState {
   settings: GameSettings;
   noteSequence: NotePosition[];
   currentIndex: number;
-  noteStartTime: number; // performance.now()
+  noteStartTime: number; // performance.now() — wall time of last beat (rhythm) or last correct answer
   answered: AnsweredNote[];
   practicePoints: number;
   practiceGameStartTime: number;
@@ -41,6 +46,12 @@ export interface GameState {
   countdownStartTime: number; // performance.now() when countdown began
   countdownCorrect: number;
   finalScore: number | null; // set when phase transitions to 'result'
+  // Rhythm mode
+  ritmoBpmCurrent: number;
+  ritmoBeatCount: number;
+  ritmoScore: number;              // accumulated score for Practice + Rhythm
+  ritmoBpmJustIncreased: boolean;  // true for one beat after a BPM increase → UI flash
+  ritmoCurrentAnswer: { timingAccuracy: number; responseTimeMs: number } | null;
 }
 
 export interface LeaderboardEntry {

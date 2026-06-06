@@ -5,6 +5,10 @@ function getCtx(): AudioContext {
   return ctx;
 }
 
+export function getAudioContext(): AudioContext {
+  return getCtx();
+}
+
 export function initAudio() {
   // Call on first user interaction to satisfy browser autoplay policy
   getCtx();
@@ -94,6 +98,40 @@ export function playNoteFrequency(staffIndex: number, espacios: number, clef: 't
   const freq = table[staffIndex - espacios];
   if (!freq) return;
   playTone(freq, 0.5, 'sine', 0.25);
+}
+
+export function scheduleMetronomeClick(atTime: number, isDownbeat: boolean): void {
+  const c = getCtx();
+  const bufferSize = Math.floor(c.sampleRate * 0.04);
+  const buffer = c.createBuffer(1, bufferSize, c.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) {
+    data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 2);
+  }
+  const source = c.createBufferSource();
+  source.buffer = buffer;
+  const gain = c.createGain();
+  gain.gain.setValueAtTime(isDownbeat ? 0.45 : 0.22, atTime);
+  source.connect(gain);
+  gain.connect(c.destination);
+  source.start(atTime);
+}
+
+export function playBpmIncrease(): void {
+  const c = getCtx();
+  [880, 1108].forEach((freq, i) => {
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.connect(gain);
+    gain.connect(c.destination);
+    osc.type = 'triangle';
+    const t = c.currentTime + i * 0.09;
+    osc.frequency.setValueAtTime(freq, t);
+    gain.gain.setValueAtTime(0.2, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+    osc.start(t);
+    osc.stop(t + 0.08);
+  });
 }
 
 export function playGameOver() {

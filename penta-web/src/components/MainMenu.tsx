@@ -2,6 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import type { GameSettings, Clef, GameMode, Accidental, LeaderboardEntry } from '../types';
 import { initAudio } from '../utils/audio';
 import { getLeaderboardKey, loadLeaderboard } from '../utils/leaderboard';
+import {
+  RITMO_BPM_DEFAULT,
+  RITMO_BPM_MIN,
+  RITMO_BPM_MAX,
+  RITMO_BPM_STEP,
+  RITMO_ACCEL_STEP_DEFAULT,
+} from '../constants';
 import Leaderboard from './Leaderboard';
 
 interface Props {
@@ -20,6 +27,8 @@ export default function MainMenu({ onStart }: Props) {
   const [keySigIdx, setKeySigIdx] = useState(0);
   const [difficulty, setDifficulty] = useState<0|1|2|3>(0);
   const [mode, setMode] = useState<GameMode>('practice');
+  const [rhythmMode, setRhythmMode] = useState(false);
+  const [ritmoBpm, setRitmoBpm] = useState(RITMO_BPM_DEFAULT);
 
   const selectedKeySig = KEY_SIG_OPTIONS[keySigIdx];
 
@@ -29,6 +38,9 @@ export default function MainMenu({ onStart }: Props) {
     randomKeySignature: selectedKeySig.random,
     difficulty,
     mode,
+    rhythmMode,
+    ritmoBpm,
+    ritmoAccelStep: RITMO_ACCEL_STEP_DEFAULT,
   };
 
   const lbKey = getLeaderboardKey(settings);
@@ -49,6 +61,8 @@ export default function MainMenu({ onStart }: Props) {
     initAudio();
     onStart(settings);
   }
+
+  const beatWindowMs = Math.round(60000 / ritmoBpm);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-950 to-gray-900 flex flex-col items-center justify-center p-4">
@@ -119,9 +133,9 @@ export default function MainMenu({ onStart }: Props) {
             </div>
           </div>
 
-          {/* Modo */}
+          {/* Tipo de juego */}
           <div>
-            <label className="text-gray-400 text-xs uppercase tracking-wider mb-2 block">Modo de juego</label>
+            <label className="text-gray-400 text-xs uppercase tracking-wider mb-2 block">Tipo de juego</label>
             <div className="flex gap-2">
               <button
                 onClick={() => setMode('practice')}
@@ -144,12 +158,67 @@ export default function MainMenu({ onStart }: Props) {
                 ⏱ Contrarreloj
               </button>
             </div>
-            {mode === 'countdown' && (
+            {mode === 'countdown' && !rhythmMode && (
               <p className="text-xs text-gray-500 mt-2">
                 Empieza con 30s. Cada acierto rápido añade tiempo al reloj.
               </p>
             )}
           </div>
+
+          {/* Enfoque */}
+          <div>
+            <label className="text-gray-400 text-xs uppercase tracking-wider mb-2 block">Enfoque</label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setRhythmMode(false)}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  !rhythmMode
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
+                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                }`}
+              >
+                ⚡ Velocidad
+              </button>
+              <button
+                onClick={() => setRhythmMode(true)}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  rhythmMode
+                    ? 'bg-orange-500 text-white shadow-lg shadow-orange-900/40'
+                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                }`}
+              >
+                🎵 Ritmo
+              </button>
+            </div>
+          </div>
+
+          {/* BPM slider (only in rhythm mode) */}
+          {rhythmMode && (
+            <div>
+              <label className="text-gray-400 text-xs uppercase tracking-wider mb-2 block">
+                BPM inicial — ♩ = <span className="text-white font-bold">{ritmoBpm}</span>
+                <span className="text-gray-600 font-normal ml-2">({beatWindowMs}ms/nota)</span>
+              </label>
+              <input
+                type="range"
+                min={RITMO_BPM_MIN}
+                max={RITMO_BPM_MAX}
+                step={RITMO_BPM_STEP}
+                value={ritmoBpm}
+                onChange={e => setRitmoBpm(Number(e.target.value))}
+                className="w-full accent-orange-500"
+              />
+              <div className="flex justify-between text-xs text-gray-600 mt-1">
+                <span>{RITMO_BPM_MIN}</span>
+                <span>{RITMO_BPM_MAX}</span>
+              </div>
+              {mode === 'countdown' && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Acelera +{RITMO_ACCEL_STEP_DEFAULT} BPM cada 16 notas
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Play Button */}
@@ -164,7 +233,9 @@ export default function MainMenu({ onStart }: Props) {
         {/* Leaderboard preview */}
         <div className="mt-6 bg-gray-900 border border-gray-800 rounded-2xl p-4">
           <h3 className="text-gray-400 text-xs uppercase tracking-wider mb-3">
-            Top 5 — {mode === 'practice' ? 'Práctica' : 'Contrarreloj'} · Clave {clef === 'treble' ? 'Sol' : 'Fa'} · +{difficulty} líneas
+            Top 5 — {mode === 'practice' ? 'Práctica' : 'Contrarreloj'}
+            {rhythmMode ? ` · Ritmo · ♩ = ${ritmoBpm}` : ''}
+            {' · '}Clave {clef === 'treble' ? 'Sol' : 'Fa'} · +{difficulty} líneas
           </h3>
           <Leaderboard entries={leaderboard} />
         </div>

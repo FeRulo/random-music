@@ -19,12 +19,19 @@ interface Props {
 export default function ResultScreen({ state, onPlayAgain, onMenu }: Props) {
   const { settings, answered, countdownCorrect } = state;
   const isPractice = settings.mode === 'practice';
+  const isRhythm = settings.rhythmMode;
   const score = state.finalScore ?? (isPractice ? 0 : countdownCorrect);
 
   const correct = answered.filter(a => a.correct).length;
-  const wrong = answered.filter(a => !a.correct).length;
+  const misses = answered.filter(a => a.missed).length;
+  const wrong = answered.filter(a => !a.correct && !a.missed).length;
   const avgTime = answered.length
     ? Math.round(answered.reduce((s, a) => s + a.responseTimeMs, 0) / answered.length / 100) / 10
+    : 0;
+
+  const rhythmAnswers = answered.filter(a => a.timingAccuracy !== null);
+  const avgPrecision = rhythmAnswers.length
+    ? Math.round(rhythmAnswers.reduce((s, a) => s + (a.timingAccuracy ?? 0), 0) / rhythmAnswers.length * 100)
     : 0;
 
   const lbKey = getLeaderboardKey(settings);
@@ -76,6 +83,12 @@ export default function ResultScreen({ state, onPlayAgain, onMenu }: Props) {
   const diffLabel = settings.difficulty === 0 ? 'Básico' : `+${settings.difficulty} líneas`;
   const clefLabel = settings.clef === 'treble' ? '𝄞 Sol' : '𝄢 Fa';
 
+  const bpmRange = isRhythm && settings.mode === 'countdown' && state.ritmoBpmCurrent !== settings.ritmoBpm
+    ? `♩ = ${settings.ritmoBpm} → ${state.ritmoBpmCurrent}`
+    : isRhythm
+      ? `♩ = ${settings.ritmoBpm}`
+      : null;
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-950 to-gray-900 flex flex-col items-center justify-start py-8 px-4">
 
@@ -99,7 +112,7 @@ export default function ResultScreen({ state, onPlayAgain, onMenu }: Props) {
                   noteSequence={chunk.map(a => a.note)}
                   currentIndex={chunk.length}
                   wrongFlash={false}
-                  noteStates={chunk.map(a => a.correct ? 'correct' : 'wrong')}
+                  noteStates={chunk.map(a => (a.correct ? 'correct' : 'wrong'))}
                 />
               </div>
             ))}
@@ -110,34 +123,71 @@ export default function ResultScreen({ state, onPlayAgain, onMenu }: Props) {
       <div className="w-full max-w-md">
         {/* Score */}
         <div className="text-center mb-6">
-          <div className="text-5xl mb-2">{isPractice ? '🎯' : '⏱'}</div>
+          <div className="text-5xl mb-2">{isRhythm ? '🎵' : isPractice ? '🎯' : '⏱'}</div>
           <h2 className="text-3xl font-bold text-white">
-            {isPractice ? 'Ronda completada' : 'Tiempo agotado'}
+            {isRhythm
+              ? (isPractice ? 'Ritmo completado' : 'Tiempo agotado')
+              : (isPractice ? 'Ronda completada' : 'Tiempo agotado')}
           </h2>
-          <p className="text-gray-500 text-sm mt-1">{clefLabel} · {diffLabel}</p>
+          <p className="text-gray-500 text-sm mt-1">
+            {clefLabel} · {diffLabel}
+            {bpmRange && <span className="ml-2">{bpmRange}</span>}
+          </p>
           <div className="mt-4">
             <span className="text-6xl font-mono font-bold text-blue-400">
               {score.toLocaleString()}
             </span>
-            <span className="text-gray-500 ml-2">{isPractice ? 'puntos' : 'aciertos'}</span>
+            <span className="text-gray-500 ml-2">
+              {isRhythm && isPractice ? 'puntos rítmicos' : isPractice ? 'puntos' : 'aciertos'}
+            </span>
           </div>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-3 text-center">
-            <div className="text-green-400 font-bold text-xl">{correct}</div>
-            <div className="text-gray-500 text-xs">Correctas</div>
+        {isRhythm ? (
+          <div className="grid grid-cols-4 gap-2 mb-6">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-3 text-center">
+              <div className="text-green-400 font-bold text-xl">{correct}</div>
+              <div className="text-gray-500 text-xs">Aciertos</div>
+            </div>
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-3 text-center">
+              <div className="text-red-400 font-bold text-xl">{misses}</div>
+              <div className="text-gray-500 text-xs">Misses</div>
+            </div>
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-3 text-center">
+              <div className="text-yellow-400 font-bold text-xl">{avgTime}s</div>
+              <div className="text-gray-500 text-xs">T/nota</div>
+            </div>
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-3 text-center">
+              <div className="text-orange-400 font-bold text-xl">{avgPrecision}%</div>
+              <div className="text-gray-500 text-xs">Precisión</div>
+            </div>
           </div>
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-3 text-center">
-            <div className="text-red-400 font-bold text-xl">{wrong}</div>
-            <div className="text-gray-500 text-xs">Errores</div>
+        ) : (
+          <div className="grid grid-cols-3 gap-3 mb-6">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-3 text-center">
+              <div className="text-green-400 font-bold text-xl">{correct}</div>
+              <div className="text-gray-500 text-xs">Correctas</div>
+            </div>
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-3 text-center">
+              <div className="text-red-400 font-bold text-xl">{wrong}</div>
+              <div className="text-gray-500 text-xs">Errores</div>
+            </div>
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-3 text-center">
+              <div className="text-yellow-400 font-bold text-xl">{avgTime}s</div>
+              <div className="text-gray-500 text-xs">Tiempo/nota</div>
+            </div>
           </div>
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-3 text-center">
-            <div className="text-yellow-400 font-bold text-xl">{avgTime}s</div>
-            <div className="text-gray-500 text-xs">Tiempo/nota</div>
+        )}
+
+        {/* Max tempo reached (rhythm + countdown) */}
+        {isRhythm && settings.mode === 'countdown' && state.ritmoBpmCurrent > settings.ritmoBpm && (
+          <div className="text-center mb-4">
+            <span className="text-orange-400 text-sm">
+              Tempo máximo alcanzado: <span className="font-bold">{state.ritmoBpmCurrent} BPM</span>
+            </span>
           </div>
-        </div>
+        )}
 
         {/* Record entry */}
         {needsName && (
@@ -150,6 +200,7 @@ export default function ResultScreen({ state, onPlayAgain, onMenu }: Props) {
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-6">
           <h3 className="text-gray-400 text-xs uppercase tracking-wider mb-3">
             Top 5 — {settings.mode === 'practice' ? 'Práctica' : 'Contrarreloj'}
+            {isRhythm ? ` · Ritmo · ♩ = ${settings.ritmoBpm}` : ''}
           </h3>
           <Leaderboard entries={entries} highlightIndex={newEntryIndex} />
         </div>

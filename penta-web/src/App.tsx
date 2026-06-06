@@ -4,14 +4,14 @@ import GameScreen from './components/GameScreen';
 import ResultScreen from './components/ResultScreen';
 
 export default function App() {
-  const { state, startGame, pressKey, tick, reset } = useGameEngine();
+  const { state, startGame, pressKey, beat, tick, reset } = useGameEngine();
 
   if (state.phase === 'menu') {
     return <MainMenu onStart={startGame} />;
   }
 
   if (state.phase === 'playing') {
-    return <GameScreen state={state} onKey={pressKey} onTick={tick} onMenu={reset} />;
+    return <GameScreen state={state} onKey={pressKey} onBeat={beat} onTick={tick} onMenu={reset} />;
   }
 
   // result

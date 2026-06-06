@@ -1,27 +1,52 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { GameState } from '../types';
 import { NOTES_PER_ROUND, SOLFEO, COUNTDOWN_START_SECONDS } from '../constants';
 import { useKeyboard } from '../hooks/useKeyboard';
 import { useCountdown } from '../hooks/useCountdown';
+import { useMetronome } from '../hooks/useMetronome';
 import StaffSVG from './staff/StaffSVG';
-import { initAudio } from '../utils/audio';
+import { initAudio, playBpmIncrease } from '../utils/audio';
 
 interface Props {
   state: GameState;
   onKey: (key: string) => void;
+  onBeat: (beatWallTime: number, beatIndex: number) => void;
   onTick: () => void;
   onMenu: () => void;
 }
 
 const NOTE_KEYS = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
 
-export default function GameScreen({ state, onKey, onTick, onMenu }: Props) {
+function timingLabel(accuracy: number): string {
+  if (accuracy > 0.85) return '🎯 Perfecto';
+  if (accuracy >= 0.5)  return '👍 Bien';
+  return '⏰ Tarde';
+}
+
+export default function GameScreen({ state, onKey, onBeat, onTick, onMenu }: Props) {
   const { settings, noteSequence, currentIndex, answered, countdownSecondsLeft, countdownCorrect } = state;
   const isPlaying = state.phase === 'playing';
   const isCountdown = settings.mode === 'countdown';
+  const isRhythm = settings.rhythmMode;
 
   useKeyboard(onKey, isPlaying, onMenu);
   useCountdown(isPlaying && isCountdown, onTick);
+
+  // Metronome (rhythm mode only)
+  const stableOnBeat = useCallback(
+    (beatWallTime: number, beatIndex: number) => onBeat(beatWallTime, beatIndex),
+    [onBeat],
+  );
+  useMetronome(isPlaying && isRhythm, state.ritmoBpmCurrent, { onBeat: stableOnBeat });
+
+  // BPM increase audio side-effect
+  const prevBpmRef = useRef(state.ritmoBpmCurrent);
+  useEffect(() => {
+    if (isRhythm && state.ritmoBpmCurrent !== prevBpmRef.current) {
+      playBpmIncrease();
+    }
+    prevBpmRef.current = state.ritmoBpmCurrent;
+  }, [isRhythm, state.ritmoBpmCurrent]);
 
   // Wrong-answer flash: briefly show active note in red
   const [wrongFlash, setWrongFlash] = useState(false);
@@ -35,6 +60,29 @@ export default function GameScreen({ state, onKey, onTick, onMenu }: Props) {
       return () => clearTimeout(t);
     }
   }, [answeredLen]);
+
+  // Beat progress bar (rhythm mode) — animated via rAF
+  const beatBarRef = useRef<HTMLDivElement>(null);
+  const bpmRefForBar = useRef(state.ritmoBpmCurrent);
+  const noteStartRefForBar = useRef(state.noteStartTime);
+  bpmRefForBar.current = state.ritmoBpmCurrent;
+  noteStartRefForBar.current = state.noteStartTime;
+
+  useEffect(() => {
+    if (!isRhythm || !isPlaying) return;
+    let rafId: number;
+    const animate = () => {
+      if (beatBarRef.current) {
+        const beatWindowMs = 60000 / bpmRefForBar.current;
+        const elapsed = performance.now() - noteStartRefForBar.current;
+        const progress = Math.min(1, Math.max(0, elapsed / beatWindowMs));
+        beatBarRef.current.style.width = `${progress * 100}%`;
+      }
+      rafId = requestAnimationFrame(animate);
+    };
+    rafId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(rafId);
+  }, [isRhythm, isPlaying]);
 
   // Progress for practice mode
   const progress = Math.round((currentIndex / NOTES_PER_ROUND) * 100);
@@ -69,25 +117,43 @@ export default function GameScreen({ state, onKey, onTick, onMenu }: Props) {
           </div>
         </div>
 
-        {isCountdown ? (
-          <div className="text-2xl font-mono font-bold" style={{ color: timerColor }}>
-            {Math.max(0, countdownSecondsLeft).toFixed(1)}s
+        {/* Center: BPM (rhythm) or note count (practice velocity) */}
+        {isRhythm ? (
+          <div
+            className={`text-xl font-mono font-bold transition-colors duration-150 ${
+              state.ritmoBpmJustIncreased ? 'text-yellow-300' : 'text-orange-400'
+            }`}
+          >
+            ♩ = {state.ritmoBpmCurrent}
           </div>
-        ) : (
+        ) : isCountdown ? null : (
           <div className="text-sm text-gray-400">
             Nota <span className="text-white font-bold">{currentIndex + 1}</span> / {NOTES_PER_ROUND}
           </div>
         )}
 
+        {/* Right: timer (countdown) or blank */}
         {isCountdown && (
-          <div className="text-sm text-gray-400">
-            <span className="text-green-400 font-bold">{countdownCorrect}</span> correctas
+          <div className="flex items-center gap-3">
+            {isRhythm && (
+              <div className="text-sm text-gray-400">
+                <span className="text-green-400 font-bold">{countdownCorrect}</span> correctas
+              </div>
+            )}
+            <div className="text-2xl font-mono font-bold" style={{ color: timerColor }}>
+              {Math.max(0, countdownSecondsLeft).toFixed(1)}s
+            </div>
+            {!isRhythm && (
+              <div className="text-sm text-gray-400">
+                <span className="text-green-400 font-bold">{countdownCorrect}</span> correctas
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Progress bar (practice mode) */}
-      {!isCountdown && (
+      {/* Progress bar (practice velocity) */}
+      {!isCountdown && !isRhythm && (
         <div className="h-1 bg-gray-800">
           <div
             className="h-full bg-blue-500 transition-all duration-300"
@@ -96,8 +162,8 @@ export default function GameScreen({ state, onKey, onTick, onMenu }: Props) {
         </div>
       )}
 
-      {/* Countdown bar */}
-      {isCountdown && (
+      {/* Countdown bar (velocity) */}
+      {isCountdown && !isRhythm && (
         <div className="h-1 bg-gray-800">
           <div
             className="h-full transition-all duration-100"
@@ -105,6 +171,17 @@ export default function GameScreen({ state, onKey, onTick, onMenu }: Props) {
               width: `${Math.max(0, (countdownSecondsLeft / COUNTDOWN_START_SECONDS) * 100)}%`,
               backgroundColor: timerColor,
             }}
+          />
+        </div>
+      )}
+
+      {/* Beat progress bar (rhythm mode) */}
+      {isRhythm && (
+        <div className="h-0.5 bg-gray-800 relative">
+          <div
+            ref={beatBarRef}
+            className="h-full bg-amber-400 absolute left-0 top-0"
+            style={{ width: '0%' }}
           />
         </div>
       )}
@@ -123,7 +200,11 @@ export default function GameScreen({ state, onKey, onTick, onMenu }: Props) {
 
       {/* Current note hint */}
       <div className="text-center py-2">
-        <p className="text-gray-600 text-xs">Identifica la nota activa (azul)</p>
+        {isRhythm ? (
+          <p className="text-gray-600 text-xs">Presiona la tecla correcta antes del siguiente beat</p>
+        ) : (
+          <p className="text-gray-600 text-xs">Identifica la nota activa (azul)</p>
+        )}
       </div>
 
       {/* Virtual keyboard buttons (for mobile/touch) */}
@@ -145,6 +226,32 @@ export default function GameScreen({ state, onKey, onTick, onMenu }: Props) {
         <div className="text-center pb-4">
           {(() => {
             const last = answered[answered.length - 1];
+            if (isRhythm) {
+              if (last.missed) {
+                return (
+                  <span className="text-red-400 text-sm font-medium">
+                    ✘ Miss — Era {last.note.letter} ({SOLFEO[last.note.letter]})
+                  </span>
+                );
+              }
+              if (last.correct && last.timingAccuracy !== null) {
+                if (settings.mode === 'practice') {
+                  const bpm = state.ritmoBpmCurrent;
+                  const baseDelta = (900 + 100 * settings.difficulty) * (bpm / 60);
+                  const pts = Math.round(baseDelta * last.timingAccuracy);
+                  return (
+                    <span className="text-green-400 text-sm font-medium">
+                      ✔ Correcto · +{pts.toLocaleString()} pts · {timingLabel(last.timingAccuracy)}
+                    </span>
+                  );
+                }
+                return (
+                  <span className="text-green-400 text-sm font-medium">
+                    ✔ Correcto · {timingLabel(last.timingAccuracy)}
+                  </span>
+                );
+              }
+            }
             return (
               <span className={`text-sm font-medium ${last.correct ? 'text-green-400' : 'text-red-400'}`}>
                 {last.correct
