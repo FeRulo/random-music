@@ -13,6 +13,7 @@ interface Props {
   onBeat: (beatWallTime: number, beatIndex: number) => void;
   onTick: () => void;
   onMenu: () => void;
+  onTogglePause: () => void;
 }
 
 const NOTE_KEYS = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
@@ -23,21 +24,32 @@ function timingLabel(accuracy: number): string {
   return '⏰ Tarde';
 }
 
-export default function GameScreen({ state, onKey, onBeat, onTick, onMenu }: Props) {
+export default function GameScreen({ state, onKey, onBeat, onTick, onMenu, onTogglePause }: Props) {
   const { settings, noteSequence, currentIndex, answered, countdownSecondsLeft, countdownCorrect } = state;
   const isPlaying = state.phase === 'playing';
+  const isPaused = state.paused;
   const isCountdown = settings.mode === 'countdown';
   const isRhythm = settings.rhythmMode;
 
-  useKeyboard(onKey, isPlaying, onMenu);
-  useCountdown(isPlaying && isCountdown, onTick);
+  useKeyboard(onKey, isPlaying && !isPaused, onMenu);
+  useCountdown(isPlaying && isCountdown && !isPaused, onTick);
+
+  // P key toggles pause
+  useEffect(() => {
+    if (!isPlaying) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === ' ') { e.preventDefault(); onTogglePause(); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isPlaying, onTogglePause]);
 
   // Metronome (rhythm mode only)
   const stableOnBeat = useCallback(
     (beatWallTime: number, beatIndex: number) => onBeat(beatWallTime, beatIndex),
     [onBeat],
   );
-  useMetronome(isPlaying && isRhythm, state.ritmoBpmCurrent, { onBeat: stableOnBeat });
+  useMetronome(isPlaying && isRhythm && !isPaused, state.ritmoBpmCurrent, { onBeat: stableOnBeat });
 
   // BPM increase audio side-effect
   const prevBpmRef = useRef(state.ritmoBpmCurrent);
@@ -66,15 +78,16 @@ export default function GameScreen({ state, onKey, onBeat, onTick, onMenu }: Pro
   // entries are the last `currentIndex` items in the answered array.
   const rhythmNoteStates = useMemo(() => {
     if (!isRhythm) return undefined;
-    return noteSequence.map((_, i): 'correct' | 'wrong' | 'active' | 'idle' => {
-      if (i === currentIndex) return 'active';
+    const states = noteSequence.map((_, i): 'correct' | 'wrong' | 'active' | 'idle' => {
+      if (i === currentIndex) return state.ritmoCurrentAnswer !== null ? 'correct' : 'active';
       if (i < currentIndex) {
         const ans = answered[answered.length - currentIndex + i];
         return ans?.correct ? 'correct' : 'wrong';
       }
       return 'idle';
     });
-  }, [isRhythm, noteSequence, currentIndex, answered]);
+    return states;
+  }, [isRhythm, noteSequence, currentIndex, answered, state.ritmoCurrentAnswer]);
 
   // Beat progress bar (rhythm mode) — animated via rAF
   const beatBarRef = useRef<HTMLDivElement>(null);
@@ -118,6 +131,17 @@ export default function GameScreen({ state, onKey, onBeat, onTick, onMenu }: Pro
             title="Volver al menú (Esc)"
           >
             ← Menú
+          </button>
+          <button
+            onClick={onTogglePause}
+            className={`text-xs px-2 py-0.5 rounded border transition-colors ${
+              isPaused
+                ? 'border-yellow-400 text-yellow-400 hover:bg-yellow-400/10'
+                : 'border-gray-600 text-gray-500 hover:text-gray-300 hover:border-gray-400'
+            }`}
+            title="Pausar / Reanudar (Espacio)"
+          >
+            {isPaused ? '▶ Reanudar' : '⏸ Pausa'}
           </button>
           <div className="text-sm text-gray-400">
             <span className="text-white font-medium">
@@ -213,6 +237,14 @@ export default function GameScreen({ state, onKey, onBeat, onTick, onMenu }: Pro
           noteStates={rhythmNoteStates}
         />
       </div>
+
+      {/* Pause banner */}
+      {isPaused && (
+        <div className="flex items-center justify-center gap-3 py-1.5 bg-yellow-400/10 border-y border-yellow-400/30">
+          <span className="text-yellow-400 font-bold text-sm tracking-widest">⏸ PAUSADO</span>
+          <span className="text-gray-500 text-xs">— Presiona Espacio para continuar</span>
+        </div>
+      )}
 
       {/* Prep countdown overlay (rhythm mode) */}
       {isRhythm && state.ritmoPrep > 0 && (

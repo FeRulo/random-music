@@ -20,6 +20,7 @@ type Action =
   | { type: 'KEY_PRESSED'; key: string; now: number }
   | { type: 'BEAT'; beatWallTime: number; beatIndex: number }
   | { type: 'TICK'; now: number }
+  | { type: 'TOGGLE_PAUSE' }
   | { type: 'RESET' };
 
 const defaultSettings: GameSettings = {
@@ -54,6 +55,7 @@ function makeInitialState(): GameState {
     ritmoCurrentAnswer: null,
     ritmoPrep: 0,
     ritmoWrongPressLetter: null,
+    paused: false,
   };
 }
 
@@ -103,7 +105,6 @@ function reducer(state: GameState, action: Action): GameState {
       if (settings.rhythmMode) {
         if (state.ritmoPrep > 0) return state; // ignore keypresses during prep
         const correct = key === currentNote.letter;
-
         if (!correct) {
           playWrong();
           return { ...state, ritmoWrongPressLetter: key };
@@ -209,7 +210,7 @@ function reducer(state: GameState, action: Action): GameState {
     }
 
     case 'BEAT': {
-      if (state.phase !== 'playing' || !state.settings.rhythmMode) return state;
+      if (state.phase !== 'playing' || !state.settings.rhythmMode || state.paused) return state;
 
       const { beatWallTime, beatIndex } = action;
 
@@ -323,7 +324,7 @@ function reducer(state: GameState, action: Action): GameState {
     }
 
     case 'TICK': {
-      if (state.phase !== 'playing' || state.settings.mode !== 'countdown') return state;
+      if (state.phase !== 'playing' || state.settings.mode !== 'countdown' || state.paused) return state;
       const newSeconds = state.countdownSecondsLeft - 0.1;
       if (newSeconds <= 0) {
         playGameOver();
@@ -331,6 +332,10 @@ function reducer(state: GameState, action: Action): GameState {
       }
       return { ...state, countdownSecondsLeft: newSeconds };
     }
+
+    case 'TOGGLE_PAUSE':
+      if (state.phase !== 'playing') return state;
+      return { ...state, paused: !state.paused };
 
     case 'RESET':
       return { ...makeInitialState(), settings: state.settings };
@@ -363,5 +368,9 @@ export function useGameEngine() {
     dispatch({ type: 'RESET' });
   }, []);
 
-  return { state, startGame, pressKey, beat, tick, reset };
+  const togglePause = useCallback(() => {
+    dispatch({ type: 'TOGGLE_PAUSE' });
+  }, []);
+
+  return { state, startGame, pressKey, beat, tick, reset, togglePause };
 }

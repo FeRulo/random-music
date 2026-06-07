@@ -56,6 +56,7 @@ export interface GameState {
   ritmoCurrentAnswer: { pressWallTime: number; responseTimeMs: number } | null;
   ritmoPrep: number;               // prep beats remaining before gameplay starts (counts 4→0)
   ritmoWrongPressLetter: string | null; // last wrong key pressed this beat (cleared on BEAT)
+  paused: boolean;
 }
 
 export interface LeaderboardEntry {
