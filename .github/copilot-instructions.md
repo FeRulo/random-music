@@ -1,6 +1,6 @@
-# CLAUDE.md
+# Copilot Instructions — random-music / PentaTrainer
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to GitHub Copilot when working with code in this repository.
 
 ---
 
@@ -26,8 +26,8 @@ Do not skip this step. These documents are the source of truth for behavior and 
 
 ### Python CLI tools (root)
 
-- **[random-notes.py](random-notes.py)** — prints N random rows of 9 chromatic notes (all 17 note names including enharmonics). Usage: `python random-notes.py <N>`
-- **[random-penta.py](random-penta.py)** — interactive terminal ear-training game: renders an ASCII bass-clef staff with randomly placed notes, asks the player to identify them. Tracks scores in `random-penta.txt`. Usage: `python random-penta.py <espacios>` where `espacios` controls ledger-line range (0 = staff only).
+- **random-notes.py** — prints N random rows of 9 chromatic notes (all 17 note names including enharmonics). Usage: `python random-notes.py <N>`
+- **random-penta.py** — interactive terminal ear-training game: renders an ASCII bass-clef staff with randomly placed notes, asks the player to identify them. Tracks scores in `random-penta.txt`. Usage: `python random-penta.py <espacios>` where `espacios` controls ledger-line range (0 = staff only).
 
 #### Dependencies (`random-penta.py`)
 - `playsound` — audio feedback (`drip.ogg` wrong, `success.mp3` correct)
@@ -78,7 +78,7 @@ npm run dev:server # Express only
 
 ## PRD summary (penta-web)
 
-Full spec: [`penta-web/docs/prd.md`](penta-web/docs/prd.md)
+Full spec: `penta-web/docs/prd.md`
 
 - **RF-01** Menu: clef (Sol/Fa), key signature (14 options), difficulty slider 0–9, game mode (Practice/Countdown), focus (Speed/Rhythm). All settings persist when returning to menu.
 - **RF-02** Staff SVG: 16 notes displayed horizontally; active note in pulsing blue; correct = green, unanswered = dark; ledger lines auto-drawn.
@@ -95,7 +95,7 @@ Full spec: [`penta-web/docs/prd.md`](penta-web/docs/prd.md)
 
 ## Architecture summary (penta-web)
 
-Full spec: [`penta-web/docs/architecture.md`](penta-web/docs/architecture.md)
+Full spec: `penta-web/docs/architecture.md`
 
 ### Difficulty → espacios mapping
 `espacios = max(0, difficulty − 3)`. Difficulty 0–2 share `espacios=0` but filter the note pool to the center 3/5/7 positions.
@@ -137,7 +137,7 @@ noteScore      = baseDelta × timingAccuracy   // Practice+Rhythm
 
 ## UX summary (penta-web)
 
-Full spec: [`penta-web/docs/ux.md`](penta-web/docs/ux.md)
+Full spec: `penta-web/docs/ux.md`
 
 ### Design principles
 1. Staff is the protagonist — UI recedes into the background.
