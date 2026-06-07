@@ -34,10 +34,31 @@ const defaultSettings: GameSettings = {
   ritmoAccelStep: RITMO_ACCEL_STEP_DEFAULT,
 };
 
+const MENU_SETTINGS_KEY = 'rmusic_menu_settings';
+
+function loadMenuSettings(): GameSettings {
+  try {
+    const raw = localStorage.getItem(MENU_SETTINGS_KEY);
+    if (!raw) return defaultSettings;
+    const parsed = JSON.parse(raw) as Partial<GameSettings>;
+    return { ...defaultSettings, ...parsed };
+  } catch {
+    return defaultSettings;
+  }
+}
+
+function saveMenuSettings(settings: GameSettings): void {
+  try {
+    localStorage.setItem(MENU_SETTINGS_KEY, JSON.stringify(settings));
+  } catch {
+    // storage unavailable — silently ignore
+  }
+}
+
 function makeInitialState(): GameState {
   return {
     phase: 'menu',
-    settings: defaultSettings,
+    settings: loadMenuSettings(),
     noteSequence: [],
     currentIndex: 0,
     noteStartTime: 0,
@@ -73,6 +94,7 @@ function calcTimingAccuracy(timingOffsetMs: number, beatWindowMs: number): numbe
 function reducer(state: GameState, action: Action): GameState {
   switch (action.type) {
     case 'START_GAME': {
+      saveMenuSettings(action.settings);
       const settings = { ...action.settings };
       if (settings.randomKeySignature) {
         settings.keySignature = randomKeySignature();

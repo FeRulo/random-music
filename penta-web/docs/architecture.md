@@ -262,6 +262,17 @@ Fuente para clave Fa: arrays `sostenidos`/`bemoles` del script original `random-
 
 Los puntajes se guardan en un servidor Express local (puerto `3001`) respaldado por SQLite. El frontend también mantiene `localStorage` como caché y fallback para cuando el servidor no está disponible.
 
+### Persistencia de configuración del menú
+
+La configuración elegida en el menú (clave, armadura, dificultad, modo de juego, enfoque ritmo, BPM inicial) se guarda en `localStorage` bajo la clave `rmusic_menu_settings` cada vez que el jugador inicia una partida (`START_GAME`). Al arrancar la app, `makeInitialState()` llama a `loadMenuSettings()`, que devuelve los ajustes guardados fusionados con los defaults (tolerando campos faltantes o JSON corrupto). Así el menú aparece pre-cargado con los últimos ajustes usados en cualquier sesión posterior.
+
+| Función | Ubicación | Comportamiento |
+|---|---|---|
+| `loadMenuSettings()` | `useGameEngine.ts` | Lee `rmusic_menu_settings`; fallback a `defaultSettings` |
+| `saveMenuSettings(settings)` | `useGameEngine.ts` | Guarda los settings del menú antes de randomizar armadura |
+
+> Los settings se guardan con los valores originales del menú (p. ej. `randomKeySignature: true`), no con la armadura sorteada en la partida, para que el menú vuelva a mostrar "Aleatoria" si eso fue lo seleccionado.
+
 ### Servidor local (`server/`)
 
 | | |

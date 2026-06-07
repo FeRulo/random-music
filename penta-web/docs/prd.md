@@ -28,6 +28,7 @@ Crear una aplicación web que convierta el ejercicio de lectura musical en un ju
 - El jugador selecciona **dificultad** mediante un slider de 10 niveles (0–9). Los niveles 0–2 restringen el pool de notas al centro del pentagrama (3, 5 ó 7 notas); el nivel 3 es el staff completo; los niveles 4–9 añaden 1–6 líneas adicionales. Mayor dificultad = más notas posibles = más puntos por acierto.
 - El jugador elige **modo de juego**: Práctica o Contrarreloj.
 - Al volver al menú (desde ResultScreen o mid-game), **todas las opciones de configuración se conservan** tal como estaban en la partida anterior, para que el jugador pueda repetir con los mismos ajustes sin reconfigurar.
+- La configuración del menú **persiste entre sesiones de navegador**: al recargar la página o volver en otro momento, los ajustes se restauran automáticamente a los últimos usados.
 
 ### RF-02 · Pentagrama visual (SVG)
 - Se muestran las 16 notas de la ronda dispuestas horizontalmente sobre el pentagrama.
