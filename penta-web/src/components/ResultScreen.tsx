@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { GameState, LeaderboardEntry } from '../types';
-import { NOTES_PER_ROUND } from '../constants';
+import { NOTES_PER_ROUND, DIFFICULTY_LABELS, difficultyToEspacios } from '../constants';
 import StaffSVG from './staff/StaffSVG';
 import {
   getLeaderboardKey, loadLeaderboard, insertEntry,
@@ -80,7 +80,7 @@ export default function ResultScreen({ state, onPlayAgain, onMenu }: Props) {
     apiSaveEntry(lbKey, newEntry).catch(() => {/* servidor no disponible, ya guardado en localStorage */});
   }
 
-  const diffLabel = settings.difficulty === 0 ? 'Básico' : `+${settings.difficulty} líneas`;
+  const diffLabel = DIFFICULTY_LABELS[settings.difficulty] ?? `nivel ${settings.difficulty}`;
   const clefLabel = settings.clef === 'treble' ? '𝄞 Sol' : '𝄢 Fa';
 
   const bpmRange = isRhythm && settings.mode === 'countdown' && state.ritmoBpmCurrent !== settings.ritmoBpm
@@ -108,7 +108,7 @@ export default function ResultScreen({ state, onPlayAgain, onMenu }: Props) {
                 <StaffSVG
                   clef={settings.clef}
                   keySignature={settings.keySignature}
-                  espacios={settings.difficulty}
+                  espacios={difficultyToEspacios(settings.difficulty)}
                   noteSequence={chunk.map(a => a.note)}
                   currentIndex={chunk.length}
                   wrongFlash={false}

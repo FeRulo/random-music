@@ -88,6 +88,25 @@ interface GameState {
 }
 ```
 
+#### Campo `difficulty`
+
+`GameSettings.difficulty` es un entero 0–9. Los valores se mapean mediante `difficultyToEspacios(d) = max(0, d − 3)`:
+
+| `difficulty` | Notas disponibles | `espacios` SVG | Label |
+|---|---|---|---|
+| 0 | 3 (centro ±1) | 0 | "3 notas" |
+| 1 | 5 (centro ±2) | 0 | "5 notas" |
+| 2 | 7 (centro ±3) | 0 | "7 notas" |
+| 3 | 9 (staff completo) | 0 | "Staff completo" |
+| 4 | 11 | 1 | "+1 línea" |
+| 5 | 13 | 2 | "+2 líneas" |
+| 6 | 15 | 3 | "+3 líneas" |
+| 7 | 17 | 4 | "+4 líneas" |
+| 8 | 19 | 5 | "+5 líneas" |
+| 9 | 21 | 6 | "+6 líneas" |
+
+Los labels canónicos están en el array `DIFFICULTY_LABELS` de `constants.ts`. Los niveles 0–2 comparten `espacios=0` pero filtran el pool de notas al subconjunto central (`staffIndex` 3–5, 2–6 ó 1–7 respectivamente).
+
 ### `NotePosition`
 
 ```ts
@@ -114,13 +133,18 @@ Puerto directo del script Python `random-penta.py`.
 CIFRADO_BASS   = [A, G, F, E, D, C, B]   // clave de Fa, top→bottom
 CIFRADO_TREBLE = [F, E, D, C, B, A, G]   // clave de Sol, top→bottom
 
+espacios = difficultyToEspacios(difficulty)   // = max(0, difficulty − 3)
+
 1. Rotar CIFRADO left por `espacios` posiciones (cambiarOrden)
 2. Extender/repetir hasta cubrir totalPositions = 9 + 2×espacios
-3. Zip (staffIndex, letter) → pool de NotePosition
+3. Zip (staffIndex, letter) → pool completo de NotePosition
+4. Si difficulty < 3: filtrar pool a staffIndex ∈ [4 − halfWidth, 4 + halfWidth]
+   donde halfWidth = difficulty + 1  (1, 2 ó 3)
 ```
 
-Con `espacios=0`, clave Sol: F5 E5 D5 C5 B4 A4 G4 F4 E4 (arriba→abajo).  
-Con `espacios=1`: se añade G5 arriba y D4 abajo (rotación -1 = shift derecho).
+Con `difficulty=3` (`espacios=0`), clave Sol: F5 E5 D5 C5 B4 A4 G4 F4 E4.  
+Con `difficulty=0`: solo D5 C5 B4 (staffIndex 2–4 — los 3 del centro).  
+Con `difficulty=4` (`espacios=1`): se añade G5 arriba y D4 abajo.
 
 ---
 
@@ -146,7 +170,7 @@ menu ──START_GAME──► playing ──(16 notas ó reloj=0)──► resu
 ### Fórmula de puntuación
 
 ```
-delta = (900 + 100 × difficulty) / responseTimeSecs
+delta = (900 + 100 × difficulty) / responseTimeSecs   // difficulty 0-9 → multiplicador 900–1800
 
 Práctica:   acierto → points += delta  |  error → points -= delta
             finalScore = points / (totalSecs / 16)

@@ -6,6 +6,8 @@ import {
   RITMO_BPM_DEFAULT,
   RITMO_ACCEL_STEP_DEFAULT,
   RITMO_BPM_MAX_GAMEPLAY,
+  RITMO_LATE_WINDOW_FRACTION,
+  DIFFICULTY_DEFAULT,
 } from '../constants';
 import { buildNotePool } from '../utils/noteMapping';
 import { generateNoteSequence } from '../utils/noteGenerator';
@@ -21,10 +23,10 @@ type Action =
   | { type: 'RESET' };
 
 const defaultSettings: GameSettings = {
-  clef: 'treble',
+  clef: 'bass',
   keySignature: { accidental: 'none', count: 0 },
   randomKeySignature: false,
-  difficulty: 0,
+  difficulty: DIFFICULTY_DEFAULT,
   mode: 'practice',
   rhythmMode: false,
   ritmoBpm: RITMO_BPM_DEFAULT,
@@ -51,6 +53,7 @@ function makeInitialState(): GameState {
     ritmoBpmJustIncreased: false,
     ritmoCurrentAnswer: null,
     ritmoPrep: 0,
+    ritmoWrongPressLetter: null,
   };
 }
 
@@ -103,7 +106,7 @@ function reducer(state: GameState, action: Action): GameState {
 
         if (!correct) {
           playWrong();
-          return state; // wrong key: sound only, no state change
+          return { ...state, ritmoWrongPressLetter: key };
         }
 
         // Ignore if already answered correctly this beat
@@ -131,6 +134,7 @@ function reducer(state: GameState, action: Action): GameState {
         timingAccuracy: null,
         timingOffsetMs: null,
         missed: false,
+        pressedLetter: correct ? null : key,
       };
 
       if (correct) {
@@ -244,6 +248,7 @@ function reducer(state: GameState, action: Action): GameState {
             timingAccuracy,
             timingOffsetMs,
             missed: false,
+            pressedLetter: null,
           }
         : {
             note: currentNote,
@@ -253,6 +258,7 @@ function reducer(state: GameState, action: Action): GameState {
             timingAccuracy: null,
             timingOffsetMs: null,
             missed: true,
+            pressedLetter: state.ritmoWrongPressLetter,
           };
 
       const newAnswered = [...state.answered, answeredNote];
@@ -281,10 +287,12 @@ function reducer(state: GameState, action: Action): GameState {
         ritmoBpmCurrent: newBpm,
         ritmoBpmJustIncreased: bpmJustIncreased,
         ritmoCurrentAnswer: null as null,
+        ritmoWrongPressLetter: null as null,
         ritmoScore: state.ritmoScore + ritmoScoreDelta,
         countdownCorrect: newCountdownCorrect,
         countdownSecondsLeft: newCountdownSeconds,
-        noteStartTime: beatWallTime,
+        // Offset noteStartTime so beat bar animation starts at ~0% when callback fires
+        noteStartTime: beatWallTime + (60000 / state.ritmoBpmCurrent) * RITMO_LATE_WINDOW_FRACTION,
       };
 
       // Practice: end after NOTES_PER_ROUND

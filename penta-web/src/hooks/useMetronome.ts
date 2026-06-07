@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { getAudioContext, scheduleMetronomeClick } from '../utils/audio';
+import { RITMO_LATE_WINDOW_FRACTION } from '../constants';
 
 const SCHEDULE_AHEAD_S = 0.1;
 const SCHEDULER_INTERVAL_MS = 25;
@@ -39,13 +40,15 @@ export function useMetronome(
 
         scheduleMetronomeClick(beatAudioTime, isDownbeat);
 
+        const beatWindowMs = (60 / bpmRef.current) * 1000;
+        const lateWindowMs = beatWindowMs * RITMO_LATE_WINDOW_FRACTION;
         const delay = beatWallTime - performance.now();
         const capturedOnBeat = onBeatRef.current;
         const capturedIndex = beatIndex;
         setTimeout(() => {
           if (cancelled) return;
           capturedOnBeat(beatWallTime, capturedIndex);
-        }, Math.max(0, delay));
+        }, Math.max(0, delay) + lateWindowMs);
 
         nextBeatTime += 60 / bpmRef.current;
         beatIndex++;

@@ -8,6 +8,10 @@ import {
   RITMO_BPM_MAX,
   RITMO_BPM_STEP,
   RITMO_ACCEL_STEP_DEFAULT,
+  DIFFICULTY_LABELS,
+  DIFFICULTY_MIN,
+  DIFFICULTY_MAX,
+  DIFFICULTY_DEFAULT,
 } from '../constants';
 import Leaderboard from './Leaderboard';
 
@@ -38,7 +42,7 @@ export default function MainMenu({ onStart, initialSettings }: Props) {
       ? findKeySigIdx(initialSettings.keySignature, initialSettings.randomKeySignature)
       : 0,
   );
-  const [difficulty, setDifficulty] = useState<0|1|2|3>(initialSettings?.difficulty ?? 0);
+  const [difficulty, setDifficulty] = useState<number>(initialSettings?.difficulty ?? DIFFICULTY_DEFAULT);
   const [mode, setMode] = useState<GameMode>(initialSettings?.mode ?? 'practice');
   const [rhythmMode, setRhythmMode] = useState(initialSettings?.rhythmMode ?? false);
   const [ritmoBpm, setRitmoBpm] = useState(initialSettings?.ritmoBpm ?? RITMO_BPM_DEFAULT);
@@ -127,22 +131,20 @@ export default function MainMenu({ onStart, initialSettings }: Props) {
           {/* Dificultad */}
           <div>
             <label className="text-gray-400 text-xs uppercase tracking-wider mb-2 block">
-              Dificultad — líneas adicionales
+              Dificultad — <span className="text-white font-medium">{DIFFICULTY_LABELS[difficulty]}</span>
             </label>
-            <div className="flex gap-2">
-              {([0,1,2,3] as (0|1|2|3)[]).map(d => (
-                <button
-                  key={d}
-                  onClick={() => setDifficulty(d)}
-                  className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${
-                    difficulty === d
-                      ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/40'
-                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                  }`}
-                >
-                  {d === 0 ? 'Básico' : `+${d}`}
-                </button>
-              ))}
+            <input
+              type="range"
+              min={DIFFICULTY_MIN}
+              max={DIFFICULTY_MAX}
+              step={1}
+              value={difficulty}
+              onChange={e => setDifficulty(Number(e.target.value))}
+              className="w-full accent-purple-500"
+            />
+            <div className="flex justify-between text-xs text-gray-600 mt-1">
+              <span>{DIFFICULTY_LABELS[DIFFICULTY_MIN]}</span>
+              <span>{DIFFICULTY_LABELS[DIFFICULTY_MAX]}</span>
             </div>
           </div>
 
@@ -248,7 +250,7 @@ export default function MainMenu({ onStart, initialSettings }: Props) {
           <h3 className="text-gray-400 text-xs uppercase tracking-wider mb-3">
             Top 5 — {mode === 'practice' ? 'Práctica' : 'Contrarreloj'}
             {rhythmMode ? ` · Ritmo · ♩ = ${ritmoBpm}` : ''}
-            {' · '}Clave {clef === 'treble' ? 'Sol' : 'Fa'} · +{difficulty} líneas
+            {' · '}Clave {clef === 'treble' ? 'Sol' : 'Fa'} · {DIFFICULTY_LABELS[difficulty]}
           </h3>
           <Leaderboard entries={leaderboard} />
         </div>

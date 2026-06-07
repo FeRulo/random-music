@@ -49,8 +49,9 @@
 │  ARMADURA                       │
 │  [ Aleatoria ▼ ]                │
 │                                 │
-│  DIFICULTAD — LÍNEAS ADICIONALES│
-│  [ Básico ] [ +1 ] [ +2 ] [ +3 ]│
+│  DIFICULTAD — Staff completo     │
+│  [──────────────●────────────]   │
+│   3 notas              +6 líneas │
 │                                 │
 │  TIPO DE JUEGO                  │
 │  [ 🎯 Práctica ] [ ⏱ Contrarreloj ] │
@@ -68,7 +69,7 @@
 
         [ ▶ Jugar ]
 
-   Top 5 — [tipo]·[enfoque] · Clave [X] · +N líneas
+   Top 5 — [tipo]·[enfoque] · Clave [X] · [label dificultad]
    #  Nombre    Puntos  Dificultad  Fecha
    1  ...
 ```
@@ -77,7 +78,7 @@
 
 - **Clave**: toggle binario; la selección activa resalta en azul.
 - **Armadura**: dropdown con 14 opciones (Aleatoria, Do mayor, 1-6♯, 1-6♭).
-- **Dificultad**: 4 botones; el activo resalta en púrpura.
+- **Dificultad**: slider de 10 niveles (0–9); el label sobre el slider muestra el nombre del nivel activo en blanco. Acento púrpura (`accent-purple-500`). Extremos: "3 notas" (mínimo) y "+6 líneas" (máximo). Default: nivel 3 "Staff completo".
 - **Tipo de juego**: toggle binario; Práctica en verde, Contrarreloj en rojo. Sin cambios respecto a v1.
 - **Enfoque**: toggle binario; Velocidad en azul neutro, Ritmo en naranja.
 - Cuando Ritmo está activo, aparece el slider de BPM (rango 40–200, paso 10, default 120).
@@ -121,8 +122,10 @@
 |---|---|---|
 | `idle` | Crema oscuro (`#1e1e2e`) | Nota aún no alcanzada |
 | `active` | Azul (`#60a5fa`) + anillo pulsante | Nota actual a identificar |
-| `wrong` (flash) | Rojo (`#f87171`) | 350ms al pulsar tecla incorrecta |
+| `wrong` (flash) | Rojo (`#f87171`) | 350ms al pulsar tecla incorrecta (modo Velocidad) |
 | `correct` | Verde (`#4ade80`) | Nota ya superada correctamente |
+
+**Modo Ritmo — coloración persistente:** en Enfoque Ritmo el color de cada nota pasada refleja el resultado real del beat. Las notas correctas quedan verdes y las fallidas (nota equivocada o miss) quedan rojas de forma permanente durante la ronda; solo la nota actual es azul. En modo Velocidad se mantiene el flash de 350ms.
 
 ### Barra de estado superior
 
@@ -141,15 +144,29 @@ Una barra fina (2–3 px) en color ámbar, separada de la barra de progreso prin
 
 ### Feedback en Enfoque Ritmo
 
-Se añade la calificación de sincronización a la línea de feedback:
+El feedback aparece en un bloque grande **justo debajo del pentagrama**, en el mismo espacio donde se muestran los números de conteo regresivo al inicio (4-3-2-1). Ocupa dos líneas: una línea grande (`text-4xl` monospace) y una sublínea descriptiva gris.
+
+**Acierto** — color según sincronización:
 ```
-✔ Correcto · +2,847 pts · 🎯 Perfecto    (timingAccuracy > 0.85)
-✔ Correcto · +1,923 pts · 👍 Bien         (0.50 – 0.85)
-✔ Correcto · +891 pts  · ⏰ Tarde         (< 0.50)
-✘ Miss — Era E (Mi)                       (beat avanzó sin respuesta correcta)
+🎯 42ms          (text-green-400,  timingAccuracy > 0.85)
+👍 87ms          (text-yellow-400, 0.50 – 0.85)
+⏰ 134ms         (text-orange-400, < 0.50)
+[sublínea]  E (Mi)
 ```
 
-En Contrarreloj + Ritmo, en lugar de `+3,241 pts` se muestra el bono de tiempo: `+2.7s`.
+**Error — nota incorrecta** (el jugador presionó la tecla equivocada antes del beat):
+```
+C → E            (text-red-400, text-4xl)
+[sublínea]  (Do) ✘ debía ser (Mi)
+```
+
+**Miss** (el beat avanzó sin ninguna tecla correcta):
+```
+miss             (text-red-400, text-4xl)
+[sublínea]  E (Mi)
+```
+
+En **Práctica + Ritmo**, se muestra adicionalmente debajo del bloque de feedback los puntos ganados en el acierto (`+2,847 pts`). En Contrarreloj no se muestran puntos individuales.
 
 ### Input
 
@@ -175,7 +192,7 @@ En Contrarreloj + Ritmo, en lugar de `+3,241 pts` se muestra el bono de tiempo: 
 
         🎯   (o ⏱ en contrarreloj / 🎵 en ritmo)
     Ronda completada
-    𝄞 Sol · Básico   (en ritmo: + "· ♩ = 120 → 150")
+    𝄞 Sol · Staff completo   (en ritmo: + "· ♩ = 120 → 150")
 
         -1,060,738    puntos
     ┌──────┐ ┌──────┐ ┌──────┐

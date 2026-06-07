@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { GameState } from '../types';
-import { NOTES_PER_ROUND, SOLFEO, COUNTDOWN_START_SECONDS } from '../constants';
+import { NOTES_PER_ROUND, SOLFEO, COUNTDOWN_START_SECONDS, DIFFICULTY_LABELS, difficultyToEspacios } from '../constants';
 import { useKeyboard } from '../hooks/useKeyboard';
 import { useCountdown } from '../hooks/useCountdown';
 import { useMetronome } from '../hooks/useMetronome';
@@ -61,6 +61,21 @@ export default function GameScreen({ state, onKey, onBeat, onTick, onMenu }: Pro
     }
   }, [answeredLen]);
 
+  // Rhythm mode: compute per-note states from answered history so missed notes show red.
+  // In countdown mode the sequence resets but answered keeps growing, so the current round's
+  // entries are the last `currentIndex` items in the answered array.
+  const rhythmNoteStates = useMemo(() => {
+    if (!isRhythm) return undefined;
+    return noteSequence.map((_, i): 'correct' | 'wrong' | 'active' | 'idle' => {
+      if (i === currentIndex) return 'active';
+      if (i < currentIndex) {
+        const ans = answered[answered.length - currentIndex + i];
+        return ans?.correct ? 'correct' : 'wrong';
+      }
+      return 'idle';
+    });
+  }, [isRhythm, noteSequence, currentIndex, answered]);
+
   // Beat progress bar (rhythm mode) — animated via rAF
   const beatBarRef = useRef<HTMLDivElement>(null);
   const bpmRefForBar = useRef(state.ritmoBpmCurrent);
@@ -113,7 +128,7 @@ export default function GameScreen({ state, onKey, onBeat, onTick, onMenu }: Pro
                 {settings.keySignature.count}{settings.keySignature.accidental === 'sharp' ? '♯' : '♭'}
               </span>
             )}
-            <span className="ml-2 text-gray-600">+{settings.difficulty} líneas</span>
+            <span className="ml-2 text-gray-600">{DIFFICULTY_LABELS[settings.difficulty]}</span>
           </div>
         </div>
 
@@ -191,10 +206,11 @@ export default function GameScreen({ state, onKey, onBeat, onTick, onMenu }: Pro
         <StaffSVG
           clef={settings.clef}
           keySignature={settings.keySignature}
-          espacios={settings.difficulty}
+          espacios={difficultyToEspacios(settings.difficulty)}
           noteSequence={noteSequence}
           currentIndex={currentIndex}
           wrongFlash={wrongFlash}
+          noteStates={rhythmNoteStates}
         />
       </div>
 
@@ -213,27 +229,40 @@ export default function GameScreen({ state, onKey, onBeat, onTick, onMenu }: Pro
 
       {/* Timing delta (rhythm mode) — shown large below staff */}
       {isRhythm && !state.ritmoPrep && (
-        <div className="text-center h-16 flex flex-col items-center justify-center gap-0.5">
+        <div className="text-center h-20 flex flex-col items-center justify-center gap-0.5">
           {(() => {
             const last = answered.length > 0 ? answered[answered.length - 1] : null;
             if (!last) return <span className="text-gray-700 text-4xl font-mono font-bold">—</span>;
-            const noteName = `${last.note.letter} (${SOLFEO[last.note.letter]})`;
-            if (last.missed) return (
-              <>
-                <span className="text-red-400 text-4xl font-mono font-bold">miss</span>
-                <span className="text-gray-500 text-sm">{noteName}</span>
-              </>
-            );
+            if (last.missed) {
+              if (last.pressedLetter) {
+                return (
+                  <>
+                    <span className="text-red-400 text-4xl font-mono font-bold tracking-widest">
+                      {last.pressedLetter} → {last.note.letter}
+                    </span>
+                    <span className="text-gray-500 text-sm">
+                      ({SOLFEO[last.pressedLetter]}) ✘ debía ser ({SOLFEO[last.note.letter]})
+                    </span>
+                  </>
+                );
+              }
+              return (
+                <>
+                  <span className="text-red-400 text-4xl font-mono font-bold">miss</span>
+                  <span className="text-gray-500 text-sm">{last.note.letter} ({SOLFEO[last.note.letter]})</span>
+                </>
+              );
+            }
             if (last.timingOffsetMs !== null) {
               const ms = Math.round(last.timingOffsetMs);
               const emoji = timingLabel(last.timingAccuracy!).split(' ')[0];
               const color =
                 last.timingAccuracy! > 0.85 ? 'text-green-400' :
-                last.timingAccuracy! >= 0.5  ? 'text-yellow-400' : 'text-red-400';
+                last.timingAccuracy! >= 0.5  ? 'text-yellow-400' : 'text-orange-400';
               return (
                 <>
                   <span className={`${color} text-4xl font-mono font-bold`}>{emoji} {ms}ms</span>
-                  <span className="text-gray-500 text-sm">{noteName}</span>
+                  <span className="text-gray-500 text-sm">{last.note.letter} ({SOLFEO[last.note.letter]})</span>
                 </>
               );
             }
@@ -267,37 +296,11 @@ export default function GameScreen({ state, onKey, onBeat, onTick, onMenu }: Pro
         ))}
       </div>
 
-      {/* Last feedback */}
-      {answered.length > 0 && (
+      {/* Last feedback — velocity mode only; rhythm feedback is shown in the timing block above */}
+      {!isRhythm && answered.length > 0 && (
         <div className="text-center pb-4">
           {(() => {
             const last = answered[answered.length - 1];
-            if (isRhythm) {
-              if (last.missed) {
-                return (
-                  <span className="text-red-400 text-sm font-medium">
-                    ✘ Miss — Era {last.note.letter} ({SOLFEO[last.note.letter]})
-                  </span>
-                );
-              }
-              if (last.correct && last.timingAccuracy !== null) {
-                if (settings.mode === 'practice') {
-                  const bpm = state.ritmoBpmCurrent;
-                  const baseDelta = (900 + 100 * settings.difficulty) * (bpm / 60);
-                  const pts = Math.round(baseDelta * last.timingAccuracy);
-                  return (
-                    <span className="text-green-400 text-sm font-medium">
-                      ✔ Correcto · +{pts.toLocaleString()} pts · {timingLabel(last.timingAccuracy)}
-                    </span>
-                  );
-                }
-                return (
-                  <span className="text-green-400 text-sm font-medium">
-                    ✔ Correcto · {timingLabel(last.timingAccuracy)}
-                  </span>
-                );
-              }
-            }
             return (
               <span className={`text-sm font-medium ${last.correct ? 'text-green-400' : 'text-red-400'}`}>
                 {last.correct
@@ -305,6 +308,23 @@ export default function GameScreen({ state, onKey, onBeat, onTick, onMenu }: Pro
                   : `✘ Era ${last.note.letter} (${SOLFEO[last.note.letter]})`}
               </span>
             );
+          })()}
+        </div>
+      )}
+      {/* Practice + rhythm: show accumulated points below feedback */}
+      {isRhythm && settings.mode === 'practice' && answered.length > 0 && (
+        <div className="text-center pb-2">
+          {(() => {
+            const last = answered[answered.length - 1];
+            if (last.correct && last.timingAccuracy !== null) {
+              const bpm = state.ritmoBpmCurrent;
+              const baseDelta = (900 + 100 * settings.difficulty) * (bpm / 60);
+              const pts = Math.round(baseDelta * last.timingAccuracy);
+              return (
+                <span className="text-gray-400 text-sm">+{pts.toLocaleString()} pts</span>
+              );
+            }
+            return null;
           })()}
         </div>
       )}

@@ -1,4 +1,5 @@
 import type { LeaderboardEntry } from '../types';
+import { DIFFICULTY_LABELS } from '../constants';
 
 interface Props {
   entries: LeaderboardEntry[];
@@ -37,7 +38,7 @@ export default function Leaderboard({ entries, highlightIndex }: Props) {
             <td className="py-2 font-medium">{e.name}</td>
             <td className="py-2 text-right font-mono">{e.score.toLocaleString()}</td>
             <td className="py-2 text-right text-gray-400 hidden sm:table-cell">
-              +{e.difficulty} líneas
+              {DIFFICULTY_LABELS[e.difficulty] ?? `+${e.difficulty}`}
             </td>
             <td className="py-2 text-right text-gray-500 hidden sm:table-cell">
               {new Date(e.date).toLocaleString('es-CO', {
